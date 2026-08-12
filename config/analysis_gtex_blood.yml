@@ -1,0 +1,53 @@
+# GTEx v8 全血用。帰属検証（結果 4）の RNA-seq 再現に使う。
+# 摂動条件がないコホートなので、条件効果・順位一貫性・ICC は測らない。
+# 測るのは「主成分を何が説明するか」と「雑音軸を抜いたあとの内部整合性」だけ。
+
+seed: 20260803
+
+donor_split:
+  discovery_fraction: 0.5
+  stratify_by: null
+  n_splits: 1
+
+conditions:
+  resting: blood
+  perturbed: []
+  cross_perturbation_pair: []
+
+preprocessing:
+  quantification: tmm_logcpm     # GSE81046 と同じ経路に揃える
+  probe_collapse: max_mean
+  expression_filter:
+    method: detected
+    min_value: 1.0               # CPM >= 1
+    min_fraction: 0.5
+  cross_sample_normalization: none
+  min_individuals: 50
+
+metrics:
+  internal_consistency:
+    method: spearman
+    split_half_repeats: 50
+    use_condition: blood
+  negative_control:
+    n_sets_per_size: 20
+    match_on: [size, mean_expression_decile]
+
+multiple_testing:
+  method: fdr_bh
+  alpha: 0.05
+
+# 主成分の説明要因として比べるもの
+attribution:
+  technical: [SMRIN, SMTSISCH, SMGEBTCH, SMNABTCH, SMCENTER]
+  biological: [AGE, SEX, DTHHRDY]
+  composition_sets: ["celltype|Neutrophils", "celltype|T Cells Naive", "celltype|B Cells",
+                     "celltype|NK Cells", "celltype|Monocytes", "celltype|Platelets"]
+  n_permutations: 200
+  n_pcs: 5
+
+output:
+  tables: results/tables/gtex_blood
+  figures: results/figures/gtex_blood
+  figure_format: [png, svg]
+  dpi: 200

@@ -1,0 +1,82 @@
+# GSE81046（初代マクロファージ RNA-seq、非感染/Listeria/Salmonella）用の解析条件。
+# 主コホート（analysis.yml）との差分は条件名だけ。seed・分割・指標・フィルタは同一に保ち、
+# 「結果の違いはデータの違いにのみ由来する」と言える状態にする。
+
+seed: 20260803
+
+donor_split:
+  discovery_fraction: 0.5
+  stratify_by: null
+  n_splits: 1
+
+conditions:
+  resting: NI
+  perturbed: [L, S]
+  # Listeria と Salmonella は同一個人の別摂動 → 摂動をまたいだ順位一貫性に使う
+  cross_perturbation_pair: [L, S]
+
+preprocessing:
+  # 定量。tmm_logcpm = expected_count に TMM 係数を掛けた log2(CPM+1)（edgeR の標準経路）。
+  # tpm を使うと「発現が何遺伝子に集中しているか」の個人差が全遺伝子に共通軸として乗り、
+  # 実測で第 1 主成分が全分散の 44.3%・全遺伝子平均 log2(TPM) と rho = -0.973 になった。
+  # 分位正規化では 35.1% までしか落ちず（順位構造は分位正規化で消えない）、
+  # 共発現解析の標準である TMM log-CPM を主経路にする。tpm は感度分析用に残す。
+  quantification: tmm_logcpm
+  probe_collapse: max_mean       # RNA-seq では「同一 symbol に複数 Ensembl ID」の畳み込みに適用
+  # 発現フィルタは RNA-seq では分位で切ってはいけない。57,905 features には lncRNA や
+  # 偽遺伝子が大量に含まれ、中位数が TPM 0.97 付近に来るため、分位規則だと未発現遺伝子が
+  # 半分近く残る。未発現遺伝子の個人間分散は測定ノイズなので、「共発現しない」という
+  # 結論が検出限界の産物になってしまう（論文 §4.5 R3 で自ら立てた反論に抵触する）。
+  # そこで RNA-seq では絶対量の標準規則（TPM >= 1 を過半数の個人で満たす）を使う。
+  # 結果として 11,829 遺伝子が残り、主コホート（マイクロアレイ 10,754）と同水準になる。
+  expression_filter:
+    method: detected          # 単位は quantification に追随（tmm_logcpm なら CPM）
+    min_value: 1.0            # CPM >= 1（edgeR filterByExpr の慣行）
+    min_fraction: 0.5
+  # 感度分析: tpm_min を 0.5（13,132 遺伝子）/ 2.0（10,434 遺伝子）に振って主張の頑健性を見る
+  #
+  # サンプル間正規化。TPM はライブラリサイズは揃えるが分布の形は揃えないため、
+  # log2(TPM+1) のままだと「発現が何遺伝子に集中しているか」の個人差が全遺伝子に
+  # 乗る。実測では第 1 主成分が全分散の 44.3% を占め、全遺伝子の平均 log2(TPM) と
+  # rho = -0.973、検出遺伝子割合と rho = -0.916 だった（＝生物学ではなく複雑度の差）。
+  # 結果としてランダム対照の内部整合性が 0.12-0.17 まで底上げされていた。
+  # 主コホートの Illumina 処理済みデータは提供元で分位正規化済みなので、
+  # 揃えないと前処理の非対称がそのまま比較の歪みになる。
+  cross_sample_normalization: none       # TMM を主経路にするため既定は none。quantile は感度分析用
+  min_individuals: 50
+
+scoring:
+  methods: [zmean, singscore, plage, meanrank]
+  reference:
+    condition_effect: pooled
+    individual_rank: within
+
+metrics:
+  internal_consistency:
+    method: spearman
+    split_half_repeats: 50
+    use_condition: NI
+  condition_effect:
+    test: wilcoxon
+    direction_test: binomial
+  rank_stability:
+    method: spearman
+    tertile_swap: true
+  negative_control:
+    n_sets_per_size: 20
+    match_on: [size, mean_expression_decile]
+
+multiple_testing:
+  method: fdr_bh
+  alpha: 0.05
+
+qualification:
+  internal_consistency_min: 0.3
+  repeat_stability_min: 0.5
+  provisional: true
+
+output:
+  tables: results/tables/gse81046
+  figures: results/figures/gse81046
+  figure_format: [png, svg]
+  dpi: 200

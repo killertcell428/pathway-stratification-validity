@@ -1,0 +1,71 @@
+# 解析条件。探索と検証を分け、乱数と閾値をすべてここに固定する。
+# ここに書いていない条件をコード側でハードコードしないこと（再現性の前提）。
+
+seed: 20260803
+
+# 探索用と検証用で個人を分割する。data_derived モジュールの導出も探索側だけで行い、
+# 内部整合性の評価は検証側で行う（同じ個人で作って同じ個人で評価する循環を避ける）。
+donor_split:
+  discovery_fraction: 0.5
+  stratify_by: null      # 現状はメタデータが最小なので層化しない
+  n_splits: 1
+
+preprocessing:
+  # 1 遺伝子に複数プローブがある場合の畳み方。max_mean は安静時条件で平均発現が
+  # 最大のプローブを代表にする（低発現プローブのノイズを混ぜない）。選ばれた
+  # プローブは全条件で共通に使う。
+  probe_collapse: max_mean
+  # 発現フィルタ。未発現遺伝子は個人間の分散が測定ノイズになるため、
+  # 内部整合性が構造的にゼロに寄る。これを除かないと「共発現しない」という
+  # 主張が検出限界の産物になる。
+  expression_filter:
+    method: percentile   # 安静時条件の平均発現の分位で切る
+    value: 50           # HT-12 は概ね半数のプローブが検出限界以下
+  min_individuals: 50
+
+conditions:
+  resting: naive
+  perturbed: [lps2, lps24, ifn24]
+  # 反復測定信頼性は本コホートでは推定不可（datasets.yml notes 参照）。
+  # 代わりに、同一個人を別の摂動で測ったときに順位が一貫するかを測る。
+  cross_perturbation_pair: [lps24, ifn24]
+
+scoring:
+  methods: [zmean, singscore, plage, meanrank]
+  # pooled: 全条件を連結した基準で z 化する（条件間差を保つ。条件効果の測定に使う）
+  # within: 条件内で基準化する（個人の順位づけに使う）
+  reference:
+    condition_effect: pooled
+    individual_rank: within
+
+metrics:
+  internal_consistency:
+    method: spearman          # 個人間での遺伝子間相関
+    split_half_repeats: 50    # split-half 信頼性の反復回数
+    use_condition: naive      # どの条件で内部整合性を測るか
+  condition_effect:
+    test: wilcoxon            # 対応あり
+    direction_test: binomial  # 構成遺伝子が同方向に動くかの検定
+  rank_stability:
+    method: spearman
+    tertile_swap: true        # 上位/下位 1/3 の入れ替わり率も出す
+  negative_control:
+    n_sets_per_size: 20
+    match_on: [size, mean_expression_decile]
+
+multiple_testing:
+  method: fdr_bh
+  alpha: 0.05
+
+qualification:
+  # 個人層別化に「使える」と判定するための暫定基準。この値そのものが研究成果なので、
+  # 予備段階では固定せず、分布を見てから決める。ここでは仮置き。
+  internal_consistency_min: 0.3
+  repeat_stability_min: 0.5
+  provisional: true
+
+output:
+  tables: results/tables
+  figures: results/figures
+  figure_format: [png, svg]
+  dpi: 200

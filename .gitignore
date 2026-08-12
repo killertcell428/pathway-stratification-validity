@@ -1,0 +1,11 @@
+# 公開データ本体は置かない（5 GB 超、各提供元の利用条件に従って各自が取得する）
+data/raw/
+data/interim/
+data/metadata/
+
+# pixi の実体環境（pixi.lock から再現できる）
+.pixi/
+
+__pycache__/
+*.pyc
+.pytest_cache/

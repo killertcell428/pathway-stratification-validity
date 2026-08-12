@@ -1,0 +1,151 @@
+# 使用する公開データセット。データ本体はリポジトリに置かず、取得元と検証情報だけを記録する。
+# fetch_datasets.py がこのファイルを読んで data/raw/ に取得し、sha256 を data/checksums/ に書く。
+
+discovery:
+  emtab2232:
+    accession: E-MTAB-2232
+    source: ArrayExpress (BioStudies)
+    platform: A-MEXP-2210  # Illumina HT-12 v4 (custom ADF)
+    citation: "Fairfax BP, et al. Science. 2014;343(6175):1246949. doi:10.1126/science.1246949"
+    design: CD14+ 精製単球、同一個人に naive / LPS 2h / LPS 24h / IFN-gamma 24h
+    n_individuals_max: 432
+    value_scale: log2 (処理済み・正規化済み)
+    role: |
+      主発見コホート。個人数が多く、同一個人に安静時と摂動後が揃う唯一の資産。
+      精製単球なので細胞組成の交絡が原理的に生じない。
+    urls:
+      sdrf: https://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/MTAB/E-MTAB-2232/E-MTAB-2232.sdrf.txt
+      idf: https://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/MTAB/E-MTAB-2232/E-MTAB-2232.idf.txt
+      processed_1: https://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/MTAB/E-MTAB-2232/E-MTAB-2232.processed.1.zip
+      processed_2: https://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/MTAB/E-MTAB-2232/E-MTAB-2232.processed.2.zip
+      adf: https://ftp.ebi.ac.uk/pub/databases/microarray/data/array/MEXP/A-MEXP-2210/A-MEXP-2210.adf.txt
+    conditions:
+      naive:   {stimulus: naive,        time_h: 0}
+      lps2:    {stimulus: stimulated,   time_h: 2,  compound: LPS}
+      lps24:   {stimulus: stimulated,   time_h: 24, compound: LPS}
+      ifn24:   {stimulus: stimulated,   time_h: 24, compound: "IFN-gamma"}
+    n_by_condition: {naive: 414, lps2: 261, lps24: 322, ifn24: 367}
+    notes: |
+      2026-08-03 に SDRF と処理済み行列を実査して確定した事実:
+      - 同一個人・同一条件の技術的反復は存在しない
+      - unstimulated 24h の 63 サンプルは SDRF に記載があるが Derived Array Data File が
+        空欄で、処理済み行列（processed.1/2.zip）に含まれない。したがって
+        「naive(0h) vs 無刺激 24h」という反復測定の代理は本データでは組めない
+      結論: 反復測定信頼性（test-retest / ICC）は本コホートでは推定できない。外部の
+      反復測定コホートが必須で、これは Aim 3 の前提条件になる。本コホートで測れるのは
+      「摂動をまたいだ順位の一貫性」（LPS 24h vs IFN-gamma 24h の同一個人比較）であり、
+      test-retest とは別の軸として扱う。
+
+  gse279480:
+    accession: GSE279480
+    source: GEO
+    citation: "[TBA] シリーズ本文で確認して記入する"
+    design: 全血
+    role: |
+      第 2 発見コホート。全血なので細胞組成が交絡する。
+      交絡ありデータでの挙動を見る対照として使う（主張の主軸には置かない）。
+    urls:
+      series_matrix: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE279nnn/GSE279480/matrix/GSE279480_series_matrix.txt.gz
+      counts: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE279nnn/GSE279480/suppl/GSE279480_P441_genecounts.csv.gz
+    status: 未組み込み（Wave 2 で追加）
+
+# 外部検証コホート。反復測定・別プラットフォーム・表現型を持つデータで、
+# 発見コホートで測れなかった評価軸を埋める。
+validation:
+  gse47353:
+    accession: GSE47353
+    source: GEO
+    platform: GPL6244  # Affymetrix Human Gene 1.0 ST（発見コホートとは別系統）
+    citation: "Tsang JS, et al. Cell. 2014;157(2):499-513. doi:10.1016/j.cell.2014.03.031"
+    design: PBMC、インフルエンザワクチン接種前後の 5 時点（day-7 / day0 / day1 / day7 / day70）、63 名
+    n_samples: 292
+    role: |
+      3 つの目的を同時に満たす。
+      (1) 反復測定信頼性: day-7 と day0 はどちらも接種前なので、同一個人・同一条件を
+          7 日間隔で測った対になる。両方を持つのは 56 名。発見コホートで測れなかった
+          test-retest / ICC をここで推定する
+      (2) 別プラットフォーム・別細胞での外部再現性: Affymetrix / PBMC であり、
+          発見コホート（Illumina / 精製 CD14+ 単球）と測定系も細胞も異なる
+      (3) 表現型予測力: mn_adjmfc_class（ワクチン応答クラス 0/1/2）を持つ個人が 42 名。
+          適格性の高いセットのスコアが応答を予測するかを検証できる
+    urls:
+      series_matrix: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE47nnn/GSE47353/matrix/GSE47353_series_matrix.txt.gz
+      platform_annotation: https://ftp.ncbi.nlm.nih.gov/geo/platforms/GPL6nnn/GPL6244/annot/GPL6244.annot.gz
+    timepoints:
+      retest_pair: [day-7, day0]   # どちらも接種前
+      post: [day1, day7, day70]
+    notes: |
+      PBMC なので細胞組成が個人間で変わる。これは交絡だが、同時に枠組みの検証にも使える。
+      精製単球では細胞種マーカーの内部整合性が低かったのに対し、PBMC では組成の個人差を
+      反映して高くなるはずである。そうならなければ指標側の問題を疑う（陽性対照）。
+
+  gse35846:
+    accession: GSE35846
+    source: GEO
+    platform: GPL10558  # Illumina HumanHT-12 V4（発見コホートと同じ系列）
+    citation: "Preininger M, et al. PLoS Genet. 2013;9(3):e1003362. doi:10.1371/journal.pgen.1003362"
+    design: 全血（Tempus tube）189 名、1 名 1 サンプル
+    n_samples: 189
+    role: |
+      技術要因と生物学的個人差を切り分けるための第 2 検証コホート（L3 の一般化）。
+      技術メタデータ（プレート ID 17 枚 / チップ内位置 A-L / 処理日 5 群 / RNA integrity
+      score）と生物学的メタデータ（性別・年齢・体脂肪率・民族・郵便番号）の両方を持つ
+      唯一の候補。発見コホートと同じ Illumina HT-12 系列なので、チップ効果の再現を
+      直接確認できる。全血なので細胞組成の交絡がある第 3 の組織文脈にもなる。
+    urls:
+      series_matrix: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE35nnn/GSE35846/matrix/GSE35846_series_matrix.txt.gz
+      platform_annotation: https://ftp.ncbi.nlm.nih.gov/geo/platforms/GPL10nnn/GPL10558/annot/GPL10558.annot.gz
+    covariates:
+      technical: [plate id, chip_position, batch effect_date, rna integrity score]
+      biological: [gender, age, percentage of body fat, ethnicity]
+    notes: |
+      189 名 / 17 プレートなので 1 プレートあたり約 11 名。発見コホート（207 名 / 59 チップ）
+      よりチップ効果が同定しやすい。反復測定はないので ICC には使えない。
+
+  # --- WP1: RNA-seq 再現（研究計画 docs/05 参照）---
+  gse81046:
+    accession: GSE81046
+    source: GEO
+    platform: RNA-seq (Illumina, RSEM gene-level)
+    citation: "Nédélec Y, et al. Cell. 2016;167(3):657-669.e21. doi:10.1016/j.cell.2016.09.025"
+    design: 初代マクロファージ、同一個人に 非感染(NI) / Listeria(L) / Salmonella(S) の 3 条件（2h）、503 検体・約 166 名。アフリカ系・ヨーロッパ系がほぼ半々
+    role: |
+      WP1 の主データ。E-MTAB-2232 の RNA-seq 版として結果 1（乖離）・結果 2（ファミリー比較）・
+      結果 3（条件依存性）を再現する。祖先集団が半々なので「3 コホートとも European」の限界も
+      同時に解消する。RAW.tar は 1 検体 1 ファイルの RSEM genes.results（TPM / expected_count）。
+    urls:
+      raw_tar: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE81nnn/GSE81046/suppl/GSE81046_RAW.tar
+    conditions:
+      resting: NI
+      perturbed: [L, S]
+    notes: |
+      2026-08-05 実査: RAW.tar 2.09GB、genes.results 503 件 + isoforms.results 503 件。
+      genes は Ensembl ID。isoforms は使わない。
+
+  gtex_v8_blood:
+    accession: GTEx v8 (Whole Blood subset)
+    source: GTEx (Google Cloud public bucket)
+    platform: RNA-seq (TPM, RNASeQC v1.1.9)
+    citation: "GTEx Consortium. Science. 2020;369(6509):1318-1330. doi:10.1126/science.aaz1776"
+    design: 全血 約 755 検体。SampleAttributes に RIN(SMRIN)・虚血時間(SMTSISCH)・バッチ(SMGEBTCH/SMNABTCH)、SubjectPhenotypes に年齢・性別
+    role: |
+      WP1 の帰属再現。結果 4（整合性の主因の分解）を、GSE35846 より豊富な共変量
+      （RIN・虚血時間・バッチ・年齢・性別 + デコンボリューションによる血球組成推定）で行う。
+    urls:
+      gene_reads: https://storage.googleapis.com/adult-gtex/bulk-gex/v8/rna-seq/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz
+      gene_tpm: https://storage.googleapis.com/adult-gtex/bulk-gex/v8/rna-seq/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz
+      sample_attributes: https://storage.googleapis.com/adult-gtex/annotations/v8/metadata-files/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt
+      subject_phenotypes: https://storage.googleapis.com/adult-gtex/annotations/v8/metadata-files/GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt
+    notes: |
+      gene_tpm.gct.gz は全組織 17,382 検体 x 56,200 遺伝子で 1.6GB。全組織を展開せず、
+      SampleAttributes の SMTSD == "Whole Blood" の列だけをストリームで抜き出す。
+
+# 未着手の候補
+external_validation_candidates:
+  - accession: GSE3649
+    citation: "Whitney AR, et al. Proc Natl Acad Sci U S A. 2003;100(4):1896-1901."
+    purpose: 同一個人の反復採血を目的に設計された古典研究。間隔を変えた ICC の再現
+    status: 未着手（2 色 cDNA アレイなので扱いが重い）
+  - accession: "[要調査] 反復測定 かつ バッチ情報を持つコホート"
+    purpose: ICC の床のうち技術的持続の寄与を分離する（L1 の完全解消）。反復測定と処理日・チップ情報の両方が必要
+    status: 未調査

@@ -1,0 +1,58 @@
+[workspace]
+name = "pathway-stratification-validity"
+description = "遺伝子セットスコアが個人の機能特性を測れるかを、公開摂動トランスクリプトームで検証する。条件効果・内部整合性・反復信頼性・外部再現性を分離して評価する。"
+version = "0.1.0"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64"]
+
+[dependencies]
+python = "3.11.*"
+pip = "*"
+setuptools = "*"
+pandas = "*"
+numpy = "*"
+scipy = "*"
+statsmodels = "*"
+scikit-learn = "*"
+pyarrow = "*"          # interim を parquet で保存する
+matplotlib = "*"
+pyyaml = "*"
+requests = "*"
+pytest = "*"
+
+[pypi-dependencies]
+# 査読用の Word 原稿を生成する（原稿の原本は manuscript/*.md、docx はそこから作る）
+python-docx = "*"
+# AI 検出器（GPTZero 等）が返す PDF から、ハイライト注釈の色と対象テキストを取り出す。
+# 投稿前に検出器を再実行するため、使い捨てにせずここに置く。
+pymupdf = "*"
+
+[tasks]
+check = "python -c \"import pandas, numpy, scipy, statsmodels, sklearn, pyarrow; print('imports OK')\""
+download = { cmd = "python -m src.download.fetch_datasets && python -m src.download.fetch_gene_sets", description = "公開データと遺伝子セットを取得し sha256 を記録する" }
+preprocess = { cmd = "python -m src.preprocessing.build_matrices", description = "条件別の gene x individual 行列を作る" }
+modules = { cmd = "python -m src.preprocessing.derive_modules", description = "探索側の個人からデータ由来共発現モジュールを作る" }
+validation = { cmd = "python -m src.preprocessing.build_validation_matrix", description = "検証コホート GSE47353 を時点別の行列にする" }
+analyze = { cmd = "python -m src.reliability.run_evaluation", description = "遺伝子セット x 手法 x 評価軸のテーブルを作る" }
+attribution = { cmd = "python -m src.reliability.attribution_check", description = "内部整合性が何に由来するかを軸別に特定する（帰属検証）" }
+batch = { cmd = "python -m src.reliability.batch_check", description = "主成分が測定チップ・位置・処理バッチで説明されるかを判定する" }
+retest = { cmd = "python -m src.reliability.retest_check", description = "反復測定信頼性(ICC)と別プラットフォームでの外部再現性を測る" }
+phenotype = { cmd = "python -m src.reliability.phenotype_check", description = "表現型（ワクチン応答クラス）予測力と、その2時点間の再現性を測る" }
+technical = { cmd = "python -m src.reliability.technical_axes_check", description = "全血コホートで技術要因・生物学要因・細胞組成の寄与を比べる" }
+sensitivity = { cmd = "python -m src.reliability.run_evaluation --min-coverage 0.3 --suffix _cov0.3 && python -m src.reliability.run_evaluation --min-coverage 0.5 --suffix _cov0.5 && python -m src.reliability.run_evaluation --min-coverage 0.8 --suffix _cov0.8 && python -m src.reliability.coverage_sensitivity", description = "被覆率フィルタの感度分析（3 水準の再走行と比較表）" }
+figures = { cmd = "python -m src.visualization.figures", description = "主要図を生成する" }
+concept = { cmd = "python -m src.visualization.build_concept_paper", description = "共同研究相談用のコンセプトペーパー(HTML 1 ファイル)を生成する" }
+docx = { cmd = "python -m src.visualization.build_docx", description = "manuscript/*.md を査読用の Word (.docx) に変換する" }
+audit = { cmd = "python -m tools.audit_numbers", description = "原稿の数値を解析出力の CSV と機械照合する（投稿前に必ず通す）" }
+test = "pytest -q tests"
+# --- WP1: RNA-seq 再現（T26_DATASET 名前空間で同じ解析コードを再実行する）---
+wp1-preprocess = { cmd = "python -m src.preprocessing.build_rnaseq_matrix", env = { T26_DATASET = "gse81046" }, description = "GSE81046 RAW.tar を条件別の gene x individual 行列にする" }
+wp1-modules = { cmd = "python -m src.preprocessing.derive_modules", env = { T26_DATASET = "gse81046" }, description = "GSE81046 の探索側個人から共発現モジュールを導出する" }
+wp1-analyze = { cmd = "python -m src.reliability.run_evaluation", env = { T26_DATASET = "gse81046" }, description = "GSE81046 で遺伝子セット x 評価軸のテーブルを作る" }
+wp1-attribution = { cmd = "python -m src.reliability.attribution_check", env = { T26_DATASET = "gse81046" }, description = "GSE81046 で内部整合性の帰属を確認する" }
+wp1-ancestry = { cmd = "python -m src.reliability.ancestry_attribution", env = { T26_DATASET = "gse81046" }, description = "GSE81046 で祖先集団が主成分を説明するかを測る" }
+wp1-normalization = { cmd = "python -m src.reliability.normalization_comparison", env = { T26_DATASET = "gse81046" }, description = "定量・正規化の選択が主成分構造と対照の水準に与える影響を測る（表 4）" }
+wp1-filter-sensitivity = { cmd = "python -m src.reliability.expression_filter_sensitivity", env = { T26_DATASET = "gse81046" }, description = "発現フィルタ閾値 CPM 0.5/1/2 で結論が変わらないかを確認する（表 7）" }
+wp1-gtex-preprocess = { cmd = "python -m src.preprocessing.build_gtex_matrix", env = { T26_DATASET = "gtex_blood" }, description = "GTEx v8 全血を TMM log-CPM 行列にする" }
+wp1-gtex-attribution = { cmd = "python -m src.reliability.gtex_attribution", env = { T26_DATASET = "gtex_blood" }, description = "GTEx で主成分の説明要因（技術/生物学/血球組成）を分解する" }
+all = { depends-on = ["download", "preprocess", "modules", "validation", "analyze", "attribution", "batch", "retest", "phenotype", "technical", "figures", "concept"] }

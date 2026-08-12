@@ -1,0 +1,53 @@
+# 評価対象の遺伝子セット。ファミリー（出自の種類）ごとに比較するのが本研究の主軸。
+# fetch_gene_sets.py が Enrichr の GMT エンドポイントから取得し、取得日と sha256 を記録する。
+# 出典が Enrichr 経由であることは論文の Methods に明記する（MSigDB 原本ではない）。
+
+source: Enrichr geneSetLibrary (https://maayanlab.cloud/Enrichr/)
+url_template: "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName={library}"
+
+families:
+  complex:
+    label: タンパク質複合体
+    library: CORUM
+    hypothesis: 物理的複合体は化学量論的に共発現しやすく、個人間でも共変動する可能性が最も高い
+  pathway:
+    label: 反応経路
+    library: Reactome_Pathways_2024
+    hypothesis: 教科書的な反応経路。条件効果は捉えるが個人間の共変動は弱いと予想
+  signature:
+    label: 発現シグネチャ
+    library: MSigDB_Hallmark_2020
+    hypothesis: 摂動応答から作られたシグネチャなので条件効果に最適化されている
+  regulon:
+    label: 転写因子 regulon
+    library: TRRUST_Transcription_Factors_2019
+    hypothesis: 共通の上流制御を共有するため、個人間でも共変動しやすいと予想
+  celltype:
+    label: 細胞種マーカー
+    library: PanglaoDB_Augmented_2021
+    hypothesis: 精製単球では細胞種マーカーの個人差は組成でなく状態差を反映する
+  # data_derived は外部ファイルを持たず、発見コホートの一部個人から算出する（circularity 回避のため
+  # 導出用と評価用で個人を分割する）。derive_modules.py が生成し data/interim に置く。
+  data_derived:
+    label: データ由来共発現モジュール
+    library: null
+    derived_from: emtab2232 naive（導出用 split のみ）
+    hypothesis: 個人間共変動を最大化するように作られるので、内部整合性では最良になるはず
+
+# 参照用（アンカー）として明示的に追跡する小規模セット。
+# 予備結果で「条件効果あり・個人層別化不可」を示した実例を、拡張後も追跡できるようにする。
+anchor_sets:
+  NOX2_complex:
+    genes: [CYBB, CYBA, NCF1, NCF2, NCF4, RAC2]
+    note: NADPH oxidase 2 複合体。刺激で協調的に動くが個人間では共変動しないことが予備結果で観察された
+  NRF2_targets:
+    genes: [NQO1, GCLC, GCLM, TXNRD1, SLC7A11, GSR, SRXN1]
+    note: Nrf2 標的（HMOX1 は多因子性が強いため除外）
+  negative_control_random:
+    genes: null
+    note: サイズと発現量分布をマッチさせたランダムセット。metrics.py が動的に生成する
+
+filters:
+  min_genes: 3          # 3 遺伝子未満は内部整合性が定義できない
+  max_genes: 200        # 巨大セットはスコアが全体平均に漸近するため除外
+  min_coverage: 0.6     # 測定プラットフォームで検出できた遺伝子の割合の下限
