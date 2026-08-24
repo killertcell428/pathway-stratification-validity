@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: このリポジトリを利用した場合は下記を引用してください。
+title: "pathway-stratification-validity: 遺伝子セットスコアの個人層別化妥当性を評価するベンチマーク"
+abstract: >-
+  公開摂動トランスクリプトームを用い、遺伝子セットスコアの条件効果と個人間整合性を
+  分離して評価する。個人層別化に用いるスコアの適格性基準を構築するための実装。
+type: software
+version: 0.1.0
+date-released: "2026-08-03"
+license: MIT
+authors:
+  - given-names: "[TBA]"
+    family-names: "[TBA]"
+    orcid: "[TBA]"
+keywords:
+  - gene set scoring
+  - patient stratification
+  - reproducibility
+  - transcriptomics
+  - perturbation response
+references:
+  - type: article
+    authors:
+      - family-names: Fairfax
+        given-names: "Benjamin P"
+    title: "Innate immune activity conditions the effect of regulatory variants upon monocyte gene expression"
+    journal: Science
+    year: 2014
+    volume: "343"
+    issue: "6175"
+    doi: 10.1126/science.1246949
+    notes: 主発見コホート E-MTAB-2232 の出典
+  - type: article
+    authors:
+      - family-names: "Toro-Domínguez"
+        given-names: Daniel
+    title: "Benchmarking single-sample gene set scoring methods for application in precision medicine"
+    journal: "Briefings in Bioinformatics"
+    year: 2025
+    volume: "26"
+    issue: "6"
+    doi: 10.1093/bib/bbaf684
+    notes: 手法側のベンチマーク。本研究は遺伝子セット側を評価対象にする補完的な位置づけ

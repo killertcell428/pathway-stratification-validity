@@ -19,6 +19,8 @@ GTEx を使う理由は共変量の豊富さにある。GSE35846 は技術と生
 
 from __future__ import annotations
 
+import os
+
 import gzip
 import sys
 
@@ -31,7 +33,10 @@ from .build_rnaseq_matrix import tmm_factors
 READS = "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz"
 SAMPLE_ATTR = "GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"
 SUBJECT_PHENO = "GTEx_Analysis_v8_Annotations_SubjectPhenotypesDS.txt"
-TISSUE = "Whole Blood"
+# 解析する組織。既存の T26_DATASET と同じ発想で環境変数から切り替える。
+# 組織ごとにコードを書き換えると「結果の違いはデータの違いにのみ由来する」
+# という WP1 の前提が崩れるため、切り替えは入出力の名前空間と設定ファイルだけで行う。
+TISSUE = os.environ.get("T26_GTEX_TISSUE", "Whole Blood")
 
 # 使う共変量。SMRIN=RNA integrity、SMTSISCH=虚血時間、SMGEBTCH=発現バッチ、
 # SMNABTCH=核酸抽出バッチ、SMCENTER=採取施設

@@ -1,0 +1,33 @@
+# GSVA を実物で走らせるための環境。主環境とは分けている。
+#
+# なぜ分けるか
+#   主環境（リポジトリ直下の pixi.toml）は conda-forge のみ・win-64 と linux-64 で、
+#   Python だけで完結させている。GSVA は Bioconductor の R パッケージで
+#   bioconda にしかなく、win-64 のビルドもない。主環境に入れると
+#   チャネルとプラットフォームの制約が変わり、Windows での再現性が落ちる。
+#   そこで linux-64（WSL）専用の別環境として切り出し、
+#   受け渡しは「発現行列と遺伝子セットを入力、スコア行列を出力」の
+#   ファイル境界に限定する。
+#
+# 使い方（WSL Ubuntu 側で実行する）
+#   cp -r <このディレクトリ> ~/gsva-env && cd ~/gsva-env
+#   pixi run gsva --help
+#
+#   /mnt/c 上で直接動かすと 9p ファイルシステムで解決が遅いため、
+#   ホーム配下にコピーして使う。入出力だけ /mnt/c を指す。
+
+[workspace]
+name = "t26-gsva"
+version = "0.1.0"
+description = "GSVA を実物の Bioconductor 実装で走らせる（T26 の手法間一致度に加えるため）"
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64"]
+
+[dependencies]
+r-base = ">=4.3"
+bioconductor-gsva = "*"
+# 入出力を CSV でやり取りするだけなので R 側の依存は最小にする
+r-optparse = "*"
+
+[tasks]
+gsva = "Rscript run_gsva.R"

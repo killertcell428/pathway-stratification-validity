@@ -20,6 +20,8 @@ derive_modules / run_evaluation / attribution / retest は同じコードのま�
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import gzip
 import io
@@ -180,14 +182,38 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config("analysis")
     resting = cfg["conditions"]["resting"]
     all_conds = [resting] + list(cfg["conditions"]["perturbed"])
-    quant = cfg["preprocessing"].get("quantification", "tpm")
-    full_path = INTERIM / "expr_full.parquet"
+    # 感度分析用に環境変数で上書きできる。名前空間（T26_DATASET）を動かすと
+    # expr_full.parquet と samples.csv の場所が変わって --reuse-full が使えなくなるので、
+    # T26_EXPR_PERCENTILE と同じく設定値だけを差し替える形にする。
+    quant = os.environ.get("T26_QUANTIFICATION") or cfg["preprocessing"].get(
+        "quantification", "tpm")
+    # 接尾辞つきの走行では別ファイルにする。INTERIM は名前空間だけを見るので、
+    # ここを固定名にすると定量を変えた走行が正本の expr_full を上書きする。
+    full_path = INTERIM / f"expr_full{MATRIX_SUFFIX}.parquet"
 
     # 閾値だけを変えて回し直すとき、tar の再読み込み（数分）と TMM の再計算は
     # 結果が同一なので省く。フィルタ前の行列は前回の走行で保存してある。
-    if args.reuse_full and full_path.exists():
-        print(f"[1/5] フィルタ前の行列を再利用: {full_path.name}")
-        expr = pd.read_parquet(full_path)
+    # 読むときは接尾辞つき → 正本の順に探す。書くのは接尾辞つきだけ。
+    # 定量が同じなら正本を再利用してよく、違えば下のガードが止める。
+    reuse_from = full_path if full_path.exists() else INTERIM / "expr_full.parquet"
+    if args.reuse_full and reuse_from.exists():
+        full_path_read = reuse_from
+        # **定量が違うなら再利用してはいけない。** expr_full は定量済みの行列で、
+        # _finish の中で quant は表示ラベルにしか使われない。ここを検査しないと
+        # T26_QUANTIFICATION=tpm を渡しても TMM logCPM の値が TPM のラベルで出てくる
+        # （実際にそれで感度分析の 1 本が無効になった）。
+        stamp = full_path_read.with_suffix(".quantification.txt")
+        built_with = stamp.read_text(encoding="utf-8").strip() if stamp.exists() else None
+        if built_with is not None and built_with != quant:
+            raise RuntimeError(
+                f"--reuse-full は定量を差し替えられない。"
+                f"{full_path_read.name} は {built_with} で作られており、要求は {quant} である。"
+                f"--reuse-full を外して tar から作り直すこと。")
+        if built_with is None:
+            print("  警告: expr_full.parquet にどの定量で作ったかの記録がない。"
+                  "定量を変えた走行では --reuse-full を外すこと")
+        print(f"[1/5] フィルタ前の行列を再利用: {full_path_read.name}（定量 {quant}）")
+        expr = pd.read_parquet(full_path_read)
         ni_cols = [c for c in expr.columns if c.endswith(f"|{resting}")]
         info = pd.read_csv(METADATA / "samples.csv")
         print(f"  {expr.shape[0]:,} genes x {expr.shape[1]} samples"
@@ -226,7 +252,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # フィルタ前の全遺伝子行列を残す（閾値の感度分析で tar を読み直さないため）
     expr.astype(np.float32).to_parquet(full_path)
-    print(f"  フィルタ前を保存: {full_path.name}（{expr.shape[0]:,} genes）")
+    # どの定量で作ったかを併記する。--reuse-full は定量を差し替えられないので、
+    # 記録しておかないと「定量を変えたつもりで前の値を使う」事故が黙って通る。
+    full_path.with_suffix(".quantification.txt").write_text(quant, encoding="utf-8")
+    print(f"  フィルタ前を保存: {full_path.name}（{expr.shape[0]:,} genes、定量 {quant}）")
 
     return _finish(cfg, args, expr, ni_cols, info, quant, all_conds, resting)
 
@@ -258,7 +287,8 @@ def _finish(cfg, args, expr, ni_cols, info, quant, all_conds, resting) -> int:
         raise ValueError(f"未実装の発現フィルタ: {spec['method']}")
     expr = expr.loc[expressed]
 
-    norm = cfg["preprocessing"].get("cross_sample_normalization")
+    norm = os.environ.get("T26_CROSS_SAMPLE_NORM",
+                          cfg["preprocessing"].get("cross_sample_normalization"))
     # YAML 側で「なし」を none / null / 空文字のどれで書いても通す。TMM を主経路に
     # した時点で既定は「なし」であり、ここで転ぶと前処理を最初から回せない。
     if norm in (None, False, "", "none", "null", "None"):

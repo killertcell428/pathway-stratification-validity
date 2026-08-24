@@ -1,0 +1,545 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遺伝子セットスコアで個人を順位づけできるか — ここまでの成果</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --canvas:#ffffff; --surface-1:#f4f4f4; --surface-2:#e0e0e0; --hairline:#e0e0e0;
+  --ink:#161616; --ink-muted:#525252; --ink-subtle:#8c8c8c;
+  --primary:#0f62fe; --blue-60:#0043ce;
+  --inverse-canvas:#161616; --inverse-ink:#ffffff; --inverse-ink-muted:#c6c6c6;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--canvas); color:var(--ink);
+  font-family:'IBM Plex Sans','Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;
+  font-size:16px; line-height:1.75; letter-spacing:0.16px;}
+.wrap{max-width:920px; margin:0 auto; padding:0 24px;}
+header.doc{padding:48px 0 20px;}
+.eyebrow{font-size:14px; color:var(--ink-muted); margin:0 0 8px;}
+h1{font-size:34px; font-weight:300; line-height:1.25; margin:0 0 14px; letter-spacing:0;}
+.lede{font-size:18px; color:var(--ink-muted); margin:0 0 8px; line-height:1.6;}
+.meta{font-size:12px; color:var(--ink-subtle); letter-spacing:0.32px; margin-top:20px;}
+h2{font-size:25px; font-weight:400; margin:52px 0 16px; letter-spacing:0; padding-top:10px; border-top:1px solid var(--hairline);}
+h3{font-size:19px; font-weight:600; margin:32px 0 10px; line-height:1.45;}
+h4{font-size:16px; font-weight:600; margin:24px 0 6px;}
+p{margin:0 0 16px;}
+a{color:var(--primary);} a:hover{color:var(--blue-60);}
+.band{background:var(--surface-1); padding:36px 0; margin:44px 0;}
+.claim{border-left:4px solid var(--ink); padding:18px 0 18px 22px; margin:22px 0; font-size:18px;}
+.arc{border:1px solid var(--hairline); margin:24px 0;}
+.arc .step{padding:20px 24px; border-bottom:1px solid var(--hairline);}
+.arc .step:last-child{border-bottom:none; background:var(--surface-1);}
+.arc .n{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-subtle); letter-spacing:0.32px;}
+.arc .h{font-weight:600; font-size:16px; margin:4px 0 6px;}
+.arc .b{font-size:14.5px; color:var(--ink-muted); margin:0;}
+.def{background:var(--surface-1); padding:18px 20px; margin:0 0 18px;}
+.def .term{font-weight:600; font-size:15px; margin-bottom:4px;}
+table{width:100%; border-collapse:collapse; margin:18px 0 26px; font-size:14px; letter-spacing:0.16px; line-height:1.6;}
+th{text-align:left; font-weight:600; border-bottom:2px solid var(--ink); padding:10px 10px 8px; vertical-align:bottom;}
+td{border-bottom:1px solid var(--hairline); padding:10px; vertical-align:top;}
+tbody tr:nth-child(even){background:var(--surface-1);}
+.num{text-align:right; font-family:'IBM Plex Mono','SF Mono',Consolas,monospace;}
+figure{margin:26px 0 32px;}
+figure img{width:100%; height:auto; display:block; border:1px solid var(--hairline);}
+figcaption{font-size:13px; color:var(--ink-muted); letter-spacing:0.16px; margin-top:8px; line-height:1.6;}
+svg{display:block; max-width:100%; height:auto;}
+ul,ol{margin:0 0 16px; padding-left:22px;} li{margin-bottom:10px;}
+code{font-family:'IBM Plex Mono','SF Mono',Consolas,monospace; font-size:13px; background:var(--surface-1); padding:1px 5px;}
+.note{font-size:14px; color:var(--ink-muted); border-left:1px solid var(--hairline); padding-left:16px; margin:0 0 18px;}
+details{border-top:1px solid var(--hairline); padding:14px 0;}
+summary{cursor:pointer; font-weight:600; font-size:15px;}
+footer.doc{background:var(--inverse-canvas); color:var(--inverse-ink-muted); margin-top:56px; padding:32px 0;}
+footer.doc h4{color:var(--inverse-ink); font-weight:400; font-size:16px; margin:0 0 8px;}
+footer.doc p{font-size:13px; margin:0 0 6px;}
+footer.doc a{color:var(--inverse-ink);}
+@media (prefers-color-scheme: dark){
+  :root{--canvas:#161616; --surface-1:#262626; --surface-2:#393939; --hairline:#393939;
+        --ink:#ffffff; --ink-muted:#c6c6c6; --ink-subtle:#8d8d8d; --primary:#4589ff;}
+  figure img{background:#fff;}
+}
+@media print{ h2{page-break-after:avoid;} footer.doc{background:none; color:#000;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">個人研究 T26 ／ ここまでの成果</p>
+  <h1>遺伝子セットスコアで個人を順位づけできるか</h1>
+  <p class="lede">「この人はこの経路が高い」という数字が、本当にその人について何かを測っているのかを検証した</p>
+  <p class="meta">2026-08-05 作成 ／ 2026-08-08 更新（RNA-seq 2 コホートを追加、主成分の帰属の集計方法を統一）／ 想定読者: 遺伝子発現解析の基礎（発現量・相関・主成分分析・多重比較）を知っている人 ／ 投稿原稿は <code>manuscript/02-投稿原稿_日本語_v1.docx</code></p>
+</header>
+
+<h2 style="border-top:none; margin-top:24px;">1. この研究は何か</h2>
+
+<p>いま論文では当たり前に、患者ごとに経路スコアを計算して並べ、上位群と下位群に分けて議論します。「この患者はインターフェロン経路が高い」という言い方です。この操作が成り立つには「セットの中の遺伝子が、人ごとに揃って動く」という前提が要る。ところが<strong>その前提を確かめた研究が見当たりません。</strong>そこを公開データ 5 コホート・2,195 遺伝子セットで測ったのがこの研究です。</p>
+
+<h3>まず、この研究がずっと区別している 2 つの「差」</h3>
+
+<p>以下の全部の土台になるので、先に置きます。</p>
+
+<ul>
+  <li><strong>同じ人の中での変化</strong> — ある人の細胞に LPS（細菌の外膜成分）を与えて 24 時間後、<strong>その人自身の</strong>遺伝子発現がどれだけ動いたか</li>
+  <li><strong>人と人の間の違い</strong> — 何もしていない安静時に、<strong>A さんと B さんで</strong>発現がどう違うか</li>
+</ul>
+
+<div class="claim">
+  「この患者はこの経路が高い」と言うとき、使っているのは<strong>後者</strong>です。ところが遺伝子セットの信頼性は、ほぼ常に<strong>前者</strong>で確かめられてきました。<strong>この 2 つがすり替わっている</strong>——これがこの論文の骨です。
+</div>
+
+<p>出発点は具体的な疑いでした。ある案件で「2 つの軸がどちらも低い人たち」を対象者として抜き出そうとしていたとき、<strong>抜き出し方を変えたら別の人たちが出てくるのではないか</strong>と考えたのが発端です。</p>
+
+<h2>2. 何が見えたか</h2>
+
+<p>5 つ見つかり、最後に 1 つ反転しました。各段落は「何を測ったか → 何と比べたか → 出た数字 → だから何が言えるか」の順で書いてあります。</p>
+
+<div class="arc">
+  <div class="step">
+    <div class="n">STEP 1</div>
+    <div class="h">刺激で動くセットは山ほどあるが、人と人を区別できるセットはほとんどない</div>
+    <p class="b">精製した CD14 陽性単球（血液中の免疫細胞の一種）を 207 人ぶん、安静時と LPS 24 時間後の 2 状態で測ったデータを使いました。遺伝子セットは 2,195 個です。<br><br>
+    <strong>同じ人の中での変化</strong>を見ます。各セットについて、安静時と刺激後のスコアを同一人物で対にして比べると、<strong>1,992 セット（90.8%）で有意に動きました</strong>。「刺激に反応する遺伝子セット」はいくらでもあります。<br><br>
+    次に<strong>人と人の間の違い</strong>を見ます。あるセットが「その人の何か」を測れているなら、安静時に<strong>セット内の遺伝子 A が高い人は遺伝子 B も高い</strong>はずです。バラバラなら、そのセットは人ごとに一つの量を測れていません。そこでセット内の全遺伝子ペアについて、207 人をまたいだ Spearman 相関を計算し、平均を取りました。<br><br>
+    比較相手を置きます。<strong>同じ遺伝子数・同じ発現量帯からランダムに選んだ遺伝子の寄せ集め</strong>です。意味のあるセットなら、これより明確に高くまとまるはずです。結果、上回ったのは <strong>100 セット（4.6%）</strong>でした。刺激で動いたのに人と人を区別できないセットが 1,902 個（86.7%）あります。<br><br>
+    具体例です。NADPH オキシダーゼ 2 複合体（CYBB, CYBA, NCF1, NCF2, NCF4, RAC2 の 6 遺伝子。活性酸素を作る、機能がはっきり分かっている複合体）は LPS で明快に動きます（|d| = 1.69）。しかし安静時の人と人の間では相関 0.027 で、<strong>ランダムな寄せ集め（0.048）を下回りました。</strong></p>
+  </div>
+  <div class="step">
+    <div class="n">STEP 2</div>
+    <div class="h">まとまるかどうかは、セットをどこから持ってきたかで決まる</div>
+    <p class="b">遺伝子セットには出どころがあります。Reactome のような<strong>公開データベースに人が登録した反応経路</strong>、CORUM のような<strong>物理的なタンパク質複合体</strong>、転写因子の標的集合（TRRUST）、細胞種マーカー（PanglaoDB）、そして<strong>このデータ自身から共発現で作ったモジュール</strong>です。<br><br>
+    上と同じランダム対照を各セットに当て、上回った割合を出しました。<strong>まとまったのはデータ自身から作ったモジュールだけ</strong>（61 件中 88.5%）でした。これは当たり前で、共発現しているものを集めて作ったのだから共発現します。<br><br>
+    問題は逆側です。Reactome の反応経路は 1,172 件中 <strong>2.0%</strong>、CORUM の複合体は 745 件中 <strong>0.8%</strong>、転写因子 regulon は 146 件中 <strong>0 件</strong>しか対照を上回りません。<strong>個人を層別化する目的では、人が知識として整理した遺伝子セットはほとんど機能していない</strong>ということです。<br><br>
+    着手前の予想は外れました。化学量論比が決まっている物理的複合体こそ個人間でも揃って動くはずだと考えていましたが、6 ファミリー中で最下位付近でした。</p>
+  </div>
+  <div class="step">
+    <div class="n">STEP 3</div>
+    <div class="h">まとまっているセットも、まとまりの正体が生物学ではない</div>
+    <p class="b">ここが一番効きます。「では、まとまっている 11% を選んで使えばいい」とはなりませんでした。<br><br>
+    主成分分析で、207 人の個人差の最大の軸（第 1 主成分、全分散の 15.5%）が何で説明されるかを調べました。このデータは Illumina BeadChip というチップで測られており、1 枚に 12 検体が乗ります。207 人は 59 枚に分かれ、<strong>各個人はちょうど 1 枚にしか乗っていません</strong>。この「どのチップで測られたか」というラベルで、第 1 主成分の <strong>89.9%</strong> が説明されました。ラベルをシャッフルしたときの偶然水準は 28.3% です。<strong>個人差に見えていた最大の軸は、その人がどのチップで測られたかでした。</strong><br><br>
+    他のコホートでも同じ構図で、ただし<strong>正体が入れ替わります</strong>。全血（マイクロアレイ 189 人／RNA-seq 755 検体）では<strong>血球組成</strong>——好中球やリンパ球の比率です。GTEx（死後提供のドナー）では<strong>虚血時間</strong>——亡くなってから組織を採るまでの経過時間が、第 1 主成分の 64% を説明しました。<br><br>
+    一方、本来「その人の特性」であるはずの<strong>年齢と性別の寄与は、死因分類の 5 分の 1 未満</strong>でした。アフリカ系とヨーロッパ系の免疫応答差を調べる目的で設計されたコホートですら、祖先集団は第 1 主成分の 2.0% しか説明しません。<br><br>
+    決定的な傍証があります。<strong>最もまとまっていた細胞種マーカーの中身が、ラベルの細胞種とまったく別のものでした</strong>——「網赤血球」と名前が付いたセット（103 遺伝子）にヘモグロビンの遺伝子が 1 つも入っておらず、中身は翻訳と核膜孔の遺伝子です。「精子」と名前が付いたセット（108 遺伝子）の中身は、C1QA・CD14・CD163 といったマクロファージそのものの遺伝子です。スコアがまとまるかどうかは、ラベルではなく中に入っている遺伝子で決まっていました。ラベルを信じて読むと、実際に測っているものを取り違えます。</p>
+  </div>
+  <div class="step">
+    <div class="n">STEP 4</div>
+    <div class="h">同じ人を 2 回測っても、同じスコアが返ってこない</div>
+    <p class="b">別のコホート（インフルエンザワクチン接種者 56 人）で、<strong>接種 7 日前と接種直前</strong>の 2 回、同じ人の血液を測ったデータがあります。どちらも接種前なので、本来はほぼ同じ値が出るはずです。<br><br>
+    再現性の指標に級内相関係数（ICC）を使いました。注釈された遺伝子セットの ICC 中央値は <strong>0.401</strong>。同サイズ・同発現量のランダムな寄せ集めは <strong>0.422</strong> です。<strong>ランダムのほうが高い。</strong>自分の対照を有意に上回ったのは 2,093 件中 <strong>15 件（0.7%）</strong>で、うち 13 件は血球サブセットのマーカー集合でした。<br><br>
+    個人差を安定して測れているように見えるのは、遺伝子セットが特別だからではなく、<strong>遺伝子をたくさん平均すれば何であれ安定する</strong>からです。7 日間隔で安定して再現している個人特性は、血球組成でした。</p>
+  </div>
+  <div class="step">
+    <div class="n">STEP 5</div>
+    <div class="h">表現型と相関するセットは、採血日を変えると入れ替わる</div>
+    <p class="b">同じ 42 人で「ワクチンによく反応したか」との相関を取りました。接種直前（day0）の採血で対照を 2 標準偏差以上上回ったセットが 147 件、その 7 日前（day-7）の採血で 154 件。<strong>両方を満たしたのは 14 件で、独立と仮定した偶然の期待値 11 件とほぼ同じ</strong>でした。<br><br>
+    コホートが違うから結果が違う、という話ではありません。<strong>同じ人の、1 週間違いの採血</strong>で入れ替わります。ある採血で「この経路が応答を予測する」と言えても、1 週間後には別の経路になります。</p>
+  </div>
+  <div class="step">
+    <div class="n">STEP 6 ／ 反転</div>
+    <div class="h">しかし、第3相まで到達した経路シグネチャは最上位で通った</div>
+    <p class="b">ここまで否定ばかりですが、基準が「何でも落とす」だけなら役に立ちません。<strong>実際に臨床で通用したシグネチャを、この基準は拾えるか</strong>を確かめました。<br><br>
+    anifrolumab（全身性エリテマトーデスの抗体医薬）の第3相試験で、患者を IFN-high / IFN-low に層別化するのに使われた I 型インターフェロンの 4 遺伝子（IFI27, IFI44, IFI44L, RSAD2）を採点しました。内部整合性 <strong>0.590</strong>（全 2,195 セットの中央値は 0.032）、ICC <strong>0.844</strong>（同 0.401）。<strong>どちらも最上位帯です。</strong><br><br>
+    この 4 遺伝子が臨床で通用したことを知らずに、発現データだけから独立に拾い上げたことになります。<strong>基準は「全部落とす」のではなく、通るものは通す。</strong></p>
+  </div>
+</div>
+
+<h2>3. だから何が言えるか</h2>
+
+<div class="claim">
+  道具が壊れているのではない。<strong>個人ごとのパスウェイスコアには機能するものと機能しないものがあり、その差は事前に測れる。そして今はほぼ誰も測っていない。</strong>
+</div>
+
+<p>「ほぼ誰も」は実測です。Europe PMC で数えると、ssGSEA / GSVA を使った論文は 5,610 件、そのうち<strong>個人ごとの予後モデルやリスクスコアを作ったものが 3,391 件</strong>。それに対し、再現性・信頼性・ICC のいずれかに言及したものは <strong>115 件（2.0%）</strong>、バッチ効果に言及したものは 57 件（1.0%）でした。</p>
+
+<h2>4. 価値はどこにあるか</h2>
+
+<p><strong>この研究の成果物は批判ではなく、事前検査です。</strong>判定に必要なのは発現データだけで、アウトカムのデータが要りません。つまり研究を始める前、患者を追跡する前、コホートを組む前に計算できます。</p>
+
+<table>
+  <thead><tr><th style="width:22%">誰にとって</th><th style="width:39%">いま起きていること</th><th>この検査が入ると</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>研究者</strong></td>
+      <td>50 個の経路でスコアを出す → 有望な関連が出る → 論文にする → 次のコホートで再現しない。1 周に数年かかる</td>
+      <td>その周回に入る前に「このセットは個人を並べる用途には向かない」が返る</td>
+    </tr>
+    <tr>
+      <td><strong>バイオマーカー開発</strong></td>
+      <td>層別化バイオマーカーを第3相まで持っていくコストは巨大。IFN シグネチャは到達し、論文にある何千ものパスウェイシグネチャは到達しなかった</td>
+      <td>賭ける先を、発現データだけで安く絞れる</td>
+    </tr>
+    <tr>
+      <td><strong>分野の規範</strong></td>
+      <td>個人層別化を主張する論文に、報告すべき項目の合意がない</td>
+      <td>qPCR の MIQE、予測モデルの TRIPOD にあたるものを個人層別化に対して置ける。論文より長く残る</td>
+    </tr>
+    <tr>
+      <td><strong>AI 解析</strong></td>
+      <td>LLM エージェントがこの推論を自動で大量に行うようになる</td>
+      <td>機械が判定できる基準が要る。この基準はそのまま採点表になる（別テーマ T28 として起票済み）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. どこが新しく、どこが既知か</h2>
+
+<p>ここを曖昧にすると、研究者と話すときに崩れます。文献を確認したうえで切り分けます。</p>
+
+<h3>既知（先人がすでに示していること）</h3>
+<ul>
+  <li><strong>ランダムな同サイズのシグネチャでも、予後予測で有意になることがある。</strong>Starmans らは 6 つの公開がんコホートで、ランダムに選んだシグネチャが有意に達する割合が平均 10%、<strong>データセットによって 1%〜約 40% と変わる</strong>ことを示し、数千のランダムシグネチャと比較する評価法を提案しました（PubMed より: Starmans MHW, et al. <em>PLoS One</em>. 2011;6(12):e28320. <a href="https://doi.org/10.1371/journal.pone.0028320">10.1371/journal.pone.0028320</a>）。<strong>「対照と比べる」という作法はここで確立しています。</strong></li>
+  <li><strong>バッチ効果が高スループットデータに広く深刻な影響を与えること</strong>（PubMed より: Leek JT, et al. <em>Nat Rev Genet</em>. 2010;11(10):733-9. <a href="https://doi.org/10.1038/nrg2825">10.1038/nrg2825</a>）</li>
+  <li><strong>注釈された経路と、データから得られる共発現モジュールが一致しないこと</strong>（共発現ネットワーク解析の分野で広く共有されている）</li>
+  <li><strong>単一サンプルスコアリング手法の体系的ベンチマークが 2025 年に出ている。</strong>18 手法を全身性エリテマトーデスの 5 コホートで比べ、実行時間・サンプルサイズや欠測遺伝子への頑健性・バッチ統合・下流の機械学習性能・臨床所見との関連まで評価しています（PubMed より: Toro-Domínguez D, et al. <em>Brief Bioinform</em>. 2025;26(6):bbaf684. <a href="https://doi.org/10.1093/bib/bbaf684">10.1093/bib/bbaf684</a>）。<strong>ただし実験変数は手法で、遺伝子セット集合は SLE 関連 5,212 セットの単一集合に固定されています。</strong>本研究は変数の割り当てが逆（セットを動かし手法を固定）なので、競合ではなく補完の関係にあります</li>
+</ul>
+<p class="note">上のベンチマークについて、以前この資料は「著者は問題提起しただけで測っていない」と書いていました。全文を確認した結果これは誤りで、著者らは無作為遺伝子で人工セットを作り偽陽性率（多くの手法で 10〜20%）を測っています。正確には<strong>「注釈の不正確さを人工セットで代表させており、実在する遺伝子セットが出自によって層別化の妥当性を変えるかは測っていない」</strong>です（2026-08-08 訂正）。</p>
+
+<h3>新しい（本研究の寄与）</h3>
+<ol>
+  <li><strong>条件効果と個人間整合性を、同一のセット・同一の個人について分離して測り、乖離を 2,195 セット規模で定量した。</strong>「刺激に反応する」と「個人を並べられる」が別能力であることを、規模をもって示した例は見当たらない。<strong>乖離の大きさはコホートに依存する</strong>（マイクロアレイ精製単球で 86.7%、RNA-seq マクロファージで 64.4%）ので、主張は特定の割合ではなく「最大の区画は常に条件効果のみ」という方向に置いている</li>
+  <li><strong>遺伝子セットの出自（ファミリー）を変数にし、スコアリング手法を共変量に固定した。</strong>既存のベンチマークは手法を実験変数とし、遺伝子セット集合（SLE 関連 5,212 セット）は固定していた</li>
+  <li><strong>整合性の主因が、その実験系で最大の攪乱要因であることを、順列検定つきで 4 コホート・4 種類の要因について示した。</strong>精製細胞なら測定チップ、全血なら血球組成、GTEx なら虚血時間。<strong>正体が実験系ごとに入れ替わっても、常に「個人の生物学」ではない</strong>という点が中心。設計変数として祖先集団を対比させたコホートでも、祖先の寄与は偶然水準との差が +0.005（p = 0.23）にとどまる</li>
+  <li><strong>遺伝子セットスコアの反復測定信頼性（ICC）が、ランダム対照の水準にあることを示した。</strong>調べた範囲で先行研究が見当たらない。<strong>本研究でいちばん新しい部分</strong></li>
+  <li><strong>Starmans らの「データセットが変わると結果が変わる」を、同じ 42 人の 1 週間違いの 2 採血まで詰めた。</strong>コホートが違うからではなく、<strong>同じ人の別の採血でも変わる</strong>ことを示した点が新しい</li>
+</ol>
+
+<p class="note">正直に言えば、これは新しい生物学的事実の発見ではありません。<strong>方法論上の発見</strong>であり、既存の作法（ランダム対照との比較）を、これまで適用されてこなかった主張の型（個人の順位づけ、反復測定信頼性）に持ち込んだものです。ただし既知の作法を使えることは弱点ではなく、<strong>分野がすでに受け入れている論法の上に立てる</strong>という強みでもあります。</p>
+
+<h2>6. 何が足りないか、次に何をするか</h2>
+
+<p>現在の到達点は「<strong>しっかりした否定的所見 ＋ 有望だが未検証の陽性基準</strong>」です。基準の側はまだ弱い。</p>
+
+<h4>解決したもの（2026-08-05 → 08-08）</h4>
+<table>
+  <thead><tr><th style="width:38%">当時の弱点</th><th>どう解決したか</th></tr></thead>
+  <tbody>
+    <tr><td><strong>測定方式がすべてマイクロアレイ</strong><br><span style="color:var(--ink-subtle)">「査読で最も指摘されやすい」と書いていた項目</span></td><td><strong>RNA-seq 2 コホートを追加して解決。</strong>初代マクロファージ（GSE81046、79 人）と GTEx v8 全血（755 検体）。<strong>解析コードは 1 行も変えず</strong>、環境変数でデータの名前空間だけ切り替えて再実行した。結果 3（帰属）は虚血時間という 4 種類目の攪乱要因まで再現。結果 1（乖離）は 86.7% → 64.4% に縮んだので、主張を「割合」から「帰属」中心に書き換えた</td></tr>
+    <tr><td>単一集団（European が多数）</td><td>GSE81046 は<strong>アフリカ系とヨーロッパ系を対比する設計</strong>のコホート。ただしそこでも祖先集団は第 1 主成分の 1.9% しか説明せず、一般性の主張には別の角度が要る</td></tr>
+  </tbody>
+</table>
+
+<h4>まだ足りないもの</h4>
+<table>
+  <thead><tr><th style="width:38%">足りないこと</th><th>どう効くか</th></tr></thead>
+  <tbody>
+    <tr><td><strong>臨床シグネチャとの照合が 4 件の逸話</strong></td><td>「基準が臨床採用を予測する」と言うには、採用されたシグネチャ群と非採用群を系統的に集めて比べる必要がある。<strong>次の一手はこれ</strong></td></tr>
+    <tr><td><strong>表現型検証の標本が 42 人</strong></td><td>|rho| = 0.4 を検出する検出力が約 70%。「予測力がない」ではなく「この規模では判定できない」が正確</td></tr>
+    <tr><td><strong>チップと個人の交絡</strong></td><td>各個人が 1 枚のチップにしか乗らないため、技術要因の寄与 0.899 は上限。同一個人を複数チップで測ったデータが要る</td></tr>
+    <tr><td>発現フィルタの感度分析</td><td>RNA-seq で CPM ≥ 1 を使ったが、0.5 / 2.0 でも結論が変わらないことを示していない。中間ファイルは保存済みなので再計算だけで済む</td></tr>
+  </tbody>
+</table>
+
+<h3>次の一手は 1 つに絞れる</h3>
+<p><strong>臨床に到達したシグネチャを N 件、到達しなかったものを N 件、系統的に集めて、この基準が両者を分けられるかを見る。</strong></p>
+<ul>
+  <li><strong>分けられれば</strong>、主張は「事前検査」になる。実務で使われる種類の成果になり、意味の大きさが一段変わる</li>
+  <li><strong>分けられなければ</strong>、「必要条件であって十分条件ではない」までで論文にする。それでも「3,391 件が確かめていない前提を初めて測った」は残る</li>
+</ul>
+<p>どちらに転んでも論文は成立する立て付けになっています。ただし上に転べば、成果の性質が変わります。</p>
+
+<div class="band"><div class="wrap">
+<p style="margin:0; font-size:15px; color:var(--ink-muted);">ここから先は、上の主張を支える技術的な内容です。定義 → 使ったデータ → 結果 6 つ → 指標の読み方 → 報告すべき項目、の順に並んでいます。</p>
+</div></div>
+
+<h2>7. 前提となる 3 つの量</h2>
+
+<div class="def">
+  <div class="term">条件効果（condition effect）</div>
+  同一個人の刺激前と刺激後でセットスコアを比べたときの差。2 条件を連結した共通基準で遺伝子ごとに z 化し、セット内平均を取ったスコアについて、対応あり Wilcoxon 検定と Cohen's d を計算した。<strong>「刺激に反応するセットかどうか」を表す。</strong>
+</div>
+
+<div class="def">
+  <div class="term">内部整合性（internal consistency）</div>
+  セット内の全遺伝子ペアについて、個人間での Spearman 相関を計算し、その平均を取った値。<strong>「そのセットの遺伝子が、人ごとに揃って高い／揃って低いか」を表す。</strong>群間比較では問われないが、個人の順位づけではこれが前提になる。<br>
+  <span style="color:var(--ink-muted)">直感的にはテストの項目分析と同じ考え方である。数学・国語・理科の平均点で生徒を並べることに意味があるのは、3 科目が同じ能力を測っているとき（＝項目間相関が高いとき）に限られる。3 科目が無相関なら、平均点の順位は科目の重みづけ次第で変わる。</span>
+</div>
+
+<div class="def">
+  <div class="term">サイズ・発現量マッチ対照（matched random control）</div>
+  評価対象のセットと<strong>同じ遺伝子数</strong>で、構成遺伝子を<strong>同じ平均発現量の十分位</strong>から無作為に抽出して作ったセット。各評価対象につき 20 個作り、正規近似で z 値を求め、Benjamini-Hochberg で多重比較補正した。<br>
+  <span style="color:var(--ink-muted)">内部整合性も ICC も、絶対値は遺伝子数と技術的共変動で膨らむ。「0.5 だった」という報告は単独では情報を持たず、対照との差だけが解釈できる。</span>
+</div>
+
+<h3>使い方 A と使い方 B の違い</h3>
+
+<svg viewBox="0 0 900 292" role="img" aria-label="群間比較と個人の順位づけで必要になる前提の違い">
+  <text x="0" y="16" font-family="IBM Plex Sans, sans-serif" font-size="14.5" font-weight="600" fill="#161616">使い方 A｜群間比較（もともとの設計目的）</text>
+  <rect x="0" y="30" width="190" height="86" fill="#f4f4f4" stroke="#e0e0e0"/>
+  <text x="12" y="50" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">患者群 n=50</text>
+  <circle cx="24" cy="72" r="6" fill="#161616"/><circle cx="44" cy="72" r="6" fill="#161616"/><circle cx="64" cy="72" r="6" fill="#161616"/><circle cx="84" cy="72" r="6" fill="#161616"/><circle cx="104" cy="72" r="6" fill="#161616"/>
+  <text x="12" y="102" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">スコア平均 1.8</text>
+  <rect x="0" y="128" width="190" height="86" fill="#f4f4f4" stroke="#e0e0e0"/>
+  <text x="12" y="148" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">健常群 n=50</text>
+  <circle cx="24" cy="170" r="6" fill="#8c8c8c"/><circle cx="44" cy="170" r="6" fill="#8c8c8c"/><circle cx="64" cy="170" r="6" fill="#8c8c8c"/><circle cx="84" cy="170" r="6" fill="#8c8c8c"/><circle cx="104" cy="170" r="6" fill="#8c8c8c"/>
+  <text x="12" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">スコア平均 0.6</text>
+  <path d="M200 122 L232 122" stroke="#161616" stroke-width="1.5"/>
+  <path d="M226 117 L232 122 L226 127" fill="none" stroke="#161616" stroke-width="1.5"/>
+  <text x="242" y="112" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#161616">主張: 群の平均に差がある</text>
+  <text x="242" y="134" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">必要な前提: 刺激・病態で</text>
+  <text x="242" y="152" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">セット内遺伝子が協調して動く</text>
+  <line x1="452" y1="8" x2="452" y2="284" stroke="#e0e0e0"/>
+  <text x="482" y="16" font-family="IBM Plex Sans, sans-serif" font-size="14.5" font-weight="600" fill="#161616">使い方 B｜個人の順位づけ（実際に行われている転用）</text>
+  <rect x="482" y="30" width="418" height="120" fill="#f4f4f4" stroke="#e0e0e0"/>
+  <text x="494" y="50" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">414 人にスコアを付けて並べる</text>
+  <rect x="494" y="62" width="128" height="32" fill="#161616"/>
+  <text x="558" y="83" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#ffffff">上位 1/3 =「高い」</text>
+  <rect x="630" y="62" width="118" height="32" fill="#e0e0e0"/>
+  <text x="672" y="83" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#161616">中位</text>
+  <rect x="756" y="62" width="132" height="32" fill="#ffffff" stroke="#161616"/>
+  <text x="822" y="83" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#161616">下位 1/3 =「低い」</text>
+  <text x="494" y="118" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#161616">主張: この個人は高い／この個人は低い</text>
+  <text x="494" y="138" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">例: 患者層別化、応答性の予測、コンパニオン診断的な利用</text>
+  <rect x="482" y="166" width="418" height="112" fill="#ffffff" stroke="#161616"/>
+  <text x="496" y="190" font-family="IBM Plex Sans, sans-serif" font-size="13.5" font-weight="600" fill="#161616">B には A にない前提が加わる</text>
+  <text x="496" y="214" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">セット内の遺伝子の発現量が、個人と個人のあいだで</text>
+  <text x="496" y="232" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#525252">互いに相関していること（＝内部整合性）</text>
+  <text x="496" y="258" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#161616">相関がなければ、順位は含める遺伝子と集約法で変わる</text>
+</svg>
+
+<h2>8. 使ったデータと、評価した対象</h2>
+
+<table>
+  <thead><tr><th style="width:22%">アクセッション</th><th style="width:34%">構成</th><th>この研究での役割</th></tr></thead>
+  <tbody>
+    <tr><td>E-MTAB-2232<br><span style="color:var(--ink-subtle)">Fairfax et al. Science 2014</span></td><td>CD14+ 精製単球、最大 414 人。同一個人について naive / LPS 2h / LPS 24h / IFN-γ 24h の 4 条件。Illumina HT-12 v4</td><td><strong>主コホート。</strong>同一個人の刺激前後が揃う。精製細胞なので細胞組成の個人差が交絡しない</td></tr>
+    <tr><td>GSE47353<br><span style="color:var(--ink-subtle)">Tsang et al. Cell 2014</span></td><td>PBMC、63 人。インフルエンザワクチン接種前後 5 時点。Affymetrix Gene 1.0 ST</td><td><strong>検証 1。</strong>day-7 と day0 はどちらも接種前なので、同一個人・同一条件を 7 日間隔で測った対になる（56 人）。ワクチン応答クラスも 42 人分ある</td></tr>
+    <tr><td>GSE35846<br><span style="color:var(--ink-subtle)">Preininger et al. PLoS Genet 2013</span></td><td>全血、189 人。プレート ID・チップ内位置・処理日・RIN 値と、性別・年齢・体脂肪率・民族を<strong>両方</strong>公開。マイクロアレイ</td><td><strong>検証 2。</strong>主成分の由来が技術要因か生物学的個人差かを直接分解できる</td></tr>
+    <tr><td>GSE81046<br><span style="color:var(--ink-subtle)">Nédélec et al. Cell 2016</span></td><td>初代マクロファージ、検証側 79 人。非感染／Listeria／Salmonella 感染。<strong>RNA-seq</strong>。アフリカ系とヨーロッパ系を対比する設計</td><td><strong>検証 3（WP1）。</strong>測定方式を変えて結果 1〜3 が再現するかを見る。祖先集団という「設計された生物学」が主成分を説明するかも同時に測れる</td></tr>
+    <tr><td>GTEx v8<br><span style="color:var(--ink-subtle)">GTEx Consortium, Science 2020</span></td><td>全血、755 検体。<strong>RNA-seq</strong>。技術要因（RIN 値・採取施設・バッチ）、生物学（年齢・性別・死因分類）、<strong>虚血時間</strong>を同時に公開</td><td><strong>検証 4（WP1）。</strong>技術・生物学・血球組成を同じ土俵で比べられる唯一のコホート。他にない<strong>虚血時間</strong>という軸を持つ</td></tr>
+  </tbody>
+</table>
+<p class="note"><strong>コホートを増やすときに解析コードを書き換えていない。</strong>環境変数 <code>T26_DATASET</code> でデータと出力の置き場所だけを切り替え、同じ評価スクリプトを再実行している。「別のデータで再現した」と言うとき、条件を合わせるために解析側を触っていたら再現の意味がなくなるため。</p>
+
+<p>候補 4,625 件のうち、フィルタ（3 遺伝子以上 200 遺伝子以下、発現フィルタを通った遺伝子での被覆率 60% 以上）を満たした 2,195 件を評価した。<strong>動かすのはセットの出自だけ</strong>で、スコアリング手法（z 平均 / singscore / PLAGE / 中央値順位）は共変量として固定した。</p>
+<table>
+  <thead><tr><th style="width:26%">出自</th><th style="width:22%">データベース</th><th>着手前に立てた予想</th></tr></thead>
+  <tbody>
+    <tr><td>タンパク質複合体</td><td>CORUM</td><td>化学量論比が決まった複合体なので、構成遺伝子は個人間でも共変動しているはず</td></tr>
+    <tr><td>反応経路</td><td>Reactome</td><td>条件効果は捉えるが、個人間の共変動は弱いはず</td></tr>
+    <tr><td>発現シグネチャ</td><td>MSigDB Hallmark</td><td>摂動実験から作られているので条件効果に最適化されているはず</td></tr>
+    <tr><td>転写因子 regulon</td><td>TRRUST</td><td>共通の転写因子に制御されるので、個人間でも共変動しやすいはず</td></tr>
+    <tr><td>細胞種マーカー</td><td>PanglaoDB</td><td>精製単球では、組成ではなく細胞状態の差を反映するはず</td></tr>
+    <tr><td>データ由来共発現モジュール</td><td>本研究で作成</td><td>個人間の共変動を最大化するように作るので、内部整合性では最良になるはず</td></tr>
+  </tbody>
+</table>
+<p class="note">データ由来モジュールは 414 人を 207 人ずつに分割し、<strong>探索側 207 人だけで導出して、検証側 207 人で評価</strong>した。自作のセットを同じ個人で評価する循環を避けるためである。外部由来の 5 ファミリーも同じ検証側 207 人で評価しているので、比較条件は揃っている。</p>
+
+<h2>9. 結果</h2>
+
+<h3>結果 1｜条件効果が有意なセットの 95% は、個人間で内部整合性を持たない</h3>
+<p>検証側 207 人・2,195 セットで、naive から LPS 24h への条件効果が有意だったのは 1,992 セット（90.8%、BH-FDR 0.05）。一方、内部整合性が 2 種類の対照（発現量マッチ／個人間分散マッチ）の<strong>両方</strong>を上回ったのは 100 セット（4.6%）にとどまった。発現量マッチ対照だけで判定しても 4.8% なので、<strong>第 2 の対照が結論を作っているわけではない</strong>。交差させると、<strong>条件効果は有意だが内部整合性が対照と区別できないセットが 1,902 件（86.7%）</strong>である。</p>
+
+<p><strong>この乖離の大きさはコホートに依存する。</strong>RNA-seq の初代マクロファージ（GSE81046、79 人、2,514 セット）で同じ解析を回すと、条件効果は 88.3% とほぼ同じだが、内部整合性の合格は 27.4% まで上がり、「条件効果のみ」は 64.4% になる。</p>
+<table>
+  <thead><tr><th style="width:40%">区画</th><th class="num">精製単球<br>（マイクロアレイ・207 人）</th><th class="num">マクロファージ<br>（RNA-seq・79 人）</th></tr></thead>
+  <tbody>
+    <tr><td>評価セット</td><td class="num">2,195</td><td class="num">2,514</td></tr>
+    <tr><td>条件効果あり</td><td class="num">90.8%</td><td class="num">88.3%</td></tr>
+    <tr><td>内部整合性あり</td><td class="num">4.6%</td><td class="num">27.4%</td></tr>
+    <tr><td><strong>条件効果のみ（層別化不可）</strong></td><td class="num"><strong>86.7%</strong></td><td class="num"><strong>64.4%</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">合格が 4 倍に増えた理由は特定できていない。培養マクロファージ（6 日間の in vitro 分化）の分化状態の個人差が強い共発現構造を作ることが一因と考えられるが、その構造は雑音軸の除去で半減する。<strong>したがって主張は「4.6%」という特定の割合ではなく、「条件効果はどのコホートでもほぼ普遍だが、内部整合性はそれより明確に少なく、最大の区画は常に条件効果のみ」という方向に置いている。</strong>この書き換えは WP1 の結果を受けて行った。</p>
+
+<figure>
+  <img src="../results/figures/fig1_dissociation.png" alt="条件効果と内部整合性の散布図">
+  <figcaption>図 1。1 点が 1 遺伝子セット。横軸は条件効果の Cohen's d の絶対値、縦軸は内部整合性。灰色帯は発現量マッチ対照の 5〜95 パーセンタイル。<strong>横軸方向に広がっても縦軸方向には広がらない</strong>のが本研究の中心的所見。</figcaption>
+</figure>
+
+<h4>発端になった具体例</h4>
+<p>NADPH オキシダーゼ 2 複合体（CYBB, CYBA, NCF1, NCF2, NCF4, RAC2 の 6 遺伝子）は、LPS 刺激で条件効果 |d| = 1.69（q = 2.4 × 10<sup>−25</sup>）と明確に反応する。ところが安静時の個人間の遺伝子ペア平均相関は 0.027 で、同サイズ・同発現量のランダム対照の 0.048 を下回る。<strong>この複合体の活性が高い個人を、安静時の発現データから同定することはできない。</strong>4 種類の手法のうち最も食い違う 2 手法では、個人順位の Spearman 相関が −0.242 だった。</p>
+
+<h3>結果 2｜文献キュレーション由来のセットは、対照とほとんど区別できなかった</h3>
+<p>着手前の予想は外れた。<strong>物理的な複合体（CORUM）と転写因子 regulon（TRRUST）が、6 ファミリー中で最も対照と区別できなかった。</strong></p>
+<table>
+  <thead><tr><th>セットの出自</th><th class="num">件数</th><th class="num">内部整合性<br>（中央値）</th><th class="num">同サイズ対照<br>（中央値）</th><th class="num">2 種の対照を<br>両方上回った割合</th></tr></thead>
+  <tbody>
+    <tr><td>データ由来共発現モジュール</td><td class="num">61</td><td class="num">0.364</td><td class="num">0.018</td><td class="num"><strong>88.5%</strong></td></tr>
+    <tr><td>細胞種マーカー（PanglaoDB）</td><td class="num">34</td><td class="num">0.051</td><td class="num">0.020</td><td class="num">32.4%</td></tr>
+    <tr><td>発現シグネチャ（Hallmark）</td><td class="num">35</td><td class="num">0.024</td><td class="num">0.016</td><td class="num">17.1%</td></tr>
+    <tr><td>反応経路（Reactome）</td><td class="num">1,172</td><td class="num">0.032</td><td class="num">0.016</td><td class="num">2.0%</td></tr>
+    <tr><td>タンパク質複合体（CORUM）</td><td class="num">745</td><td class="num">0.023</td><td class="num">0.016</td><td class="num"><strong>0.8%</strong></td></tr>
+    <tr><td>転写因子 regulon（TRRUST）</td><td class="num">146</td><td class="num">0.008</td><td class="num">0.015</td><td class="num"><strong>0.0%</strong></td></tr>
+  </tbody>
+</table>
+<p>理由は 2 通り考えられ、まだ区別できていない。<strong>(a) 測定レベルの問題</strong>: 複合体の化学量論比はタンパク質レベルで調整され、転写産物量には個人差として現れない。<strong>(b) 注釈粒度の問題</strong>: 注釈単位が、実際に共変動する単位より粗い。プロテオミクスとの照合、および発現データから推定した regulon との比較で切り分けられる。</p>
+
+<h3>結果 3｜内部整合性は、どの条件で測定するかによって変わる</h3>
+<p>NOX2 複合体と Nrf2 標的群の内部整合性は、安静時には −0.014 だが、<strong>LPS 24 時間後には 0.197 に上がる</strong>。逆にデータ由来モジュールは 0.364 から 0.172 に下がる。<strong>個人の応答能力は、静止状態の発現量では測定できない。</strong>この観点は、1 時点の横断デザインからは原理的に得られない。</p>
+
+<h3>結果 4｜内部整合性の主因は、実験系で最大のばらつき要因だった</h3>
+<p>細胞種マーカーのうち内部整合性が高かったのは <strong>Hemangioblasts（0.123）、Trophoblast Progenitor Cells（0.102）、Reticulocytes（0.074）</strong>である。ただしこれは「その細胞種が単球に混ざっている」という話ではない。GMT を開くと遺伝子内容がラベルと対応しておらず、Hemangioblasts は赤血球・血小板のプログラム、Trophoblast Progenitor はミエロイドとインターフェロン、Reticulocytes は翻訳と核膜孔（ヘモグロビン遺伝子は 0 件）である。<strong>整合性はラベルではなく遺伝子内容に対応し、その内容は検体の中に実在する軸に帰属する。</strong>逆に "Monocytes" のマーカー集合は対照を上回らなかった（z = 1.58）。</p>
+<table>
+  <thead><tr><th>主成分</th><th class="num">全分散に<br>占める割合</th><th class="num">チップによる<br>説明率 R²</th><th class="num">ラベル並べ替えによる<br>偶然水準</th><th class="num">超過分</th><th class="num">p</th></tr></thead>
+  <tbody>
+    <tr><td><strong>PC1</strong></td><td class="num">15.5%</td><td class="num"><strong>0.899</strong></td><td class="num">0.283</td><td class="num"><strong>+0.616</strong></td><td class="num">0.005</td></tr>
+    <tr><td>PC2</td><td class="num">6.3%</td><td class="num">0.509</td><td class="num">0.282</td><td class="num">+0.227</td><td class="num">0.005</td></tr>
+    <tr><td>PC5</td><td class="num">3.7%</td><td class="num">0.650</td><td class="num">0.283</td><td class="num">+0.367</td><td class="num">0.005</td></tr>
+  </tbody>
+</table>
+<p>チップ内位置と処理バッチは、どの主成分でも偶然水準を超えなかった。各個人がちょうど 1 枚のチップにしか乗らないため、チップ効果は個人の識別情報と完全に交絡する。全血コホートでは内訳が変わる。</p>
+<table>
+  <thead><tr><th style="width:20%">要因の分類</th><th class="num" style="width:16%">寄与<br>（寄与率で加重）</th><th>内訳</th></tr></thead>
+  <tbody>
+    <tr><td><strong>血球組成</strong></td><td class="num"><strong>1.053</strong></td><td>PC1 はリンパ球系（naive T 0.485、B 0.320、NK 0.219）、PC2 はミエロイド系（好中球 0.774、血小板 0.689、単球 0.688）</td></tr>
+    <tr><td>技術要因</td><td class="num">0.125</td><td>ほぼすべてがプレート。<strong>RIN 値・処理日・チップ内位置はいずれも寄与しない</strong></td></tr>
+    <tr><td>個人属性</td><td class="num">0.087</td><td>民族 0.032、体脂肪率 0.027、年齢 0.022、性別 0.006</td></tr>
+  </tbody>
+</table>
+<p class="note">RIN 値が寄与しなかったことは、それ自体が有用な否定的結果である。RNA 品質を揃えてもこの問題は解決しない。</p>
+
+<h4>RNA-seq でも同じ順序になる（WP1）</h4>
+<p>GTEx v8 全血（755 検体）は技術・生物学・血球組成の共変量を同時に持つため、分解の精度が最も高い。さらに他のコホートにない<strong>虚血時間</strong>——死後から組織採取までの経過時間——を持つ。これは生物学とも技術ともつかない要因である。</p>
+<table>
+  <thead><tr><th style="width:20%">要因の分類</th><th class="num" style="width:16%">寄与<br>（寄与率で加重）</th><th>内訳</th></tr></thead>
+  <tbody>
+    <tr><td><strong>血球組成</strong></td><td class="num"><strong>1.510</strong></td><td>好中球 +0.396、血小板 +0.348、単球 +0.310、NK +0.270、naive T +0.122、B +0.064</td></tr>
+    <tr><td>技術要因</td><td class="num">0.594</td><td><strong>虚血時間 +0.329</strong>、採取施設 +0.099、RIN 値 +0.072、発現バッチ +0.064、抽出バッチ +0.029</td></tr>
+    <tr><td>生物学</td><td class="num">0.388</td><td><strong>死因分類 +0.326</strong>、年齢 +0.056、性別 +0.005</td></tr>
+  </tbody>
+</table>
+<p>第 1 主成分（全分散の 29.3%）だけを見ると、好中球比率 R² = 0.787（偶然水準 0.005）、血小板 0.677、<strong>虚血時間 0.640</strong>、死因分類 0.623 で説明される。<strong>「生物学」の 0.388 のうち 0.326 は死因分類</strong>で、これはドナーがどう亡くなったかという状況であって安定した個人特性ではない。<strong>安定した個人特性と言える年齢と性別は合わせて 0.061 しかなく、死因分類の 5 分の 1 未満である。</strong></p>
+
+<p class="note"><strong>集計方法についての訂正（2026-08-08）。</strong>主成分をまたぐ集計は、各主成分の寄与率で重み付けし、対象 5 主成分の寄与率合計で正規化している。単純に足すと寄与率 3.3% の PC5 が 29.3% の PC1 と同じ重みになり、主成分構造の異なるコホート同士を比較できない。<strong>以前この資料は GTEx 側だけ単純合計（4.199 / 1.840 / 1.024）を載せ、加重した全血の値と並べて比較していた。定義の違うものを比べていたので、両方を加重に統一した。</strong>順序（血球組成 &gt; 技術 &gt; 個人属性）は変わらず、年齢＋性別との差はむしろ広がった。</p>
+
+<h4>設計された生物学でさえ、支配軸ではない</h4>
+<p>GSE81046 はアフリカ系とヨーロッパ系の免疫応答差を調べるために設計されたコホートである。にもかかわらず、<strong>祖先集団は第 1 主成分（全分散の 35.5%）の 2.0% しか説明しない</strong>。ラベル並べ替えによる偶然水準 1.4% との差は +0.006 にすぎない（p = 0.23）。</p>
+
+<figure>
+  <img src="../results/figures/fig7_cross_cohort_attribution.png" alt="4コホートにおける第1主成分の説明要因の比較">
+  <figcaption>図 7。横軸は第 1 主成分の説明率 R² からラベル並べ替えの偶然水準を引いた超過分。各コホートについて分類ごとの最大要因を示す。<strong>細胞組成・採取時の状況・技術のいずれかが常に上位を占め、個人属性（民族・祖先集団・年齢）は一貫して小さい。</strong>正体はコホートごとに入れ替わるが、入れ替わった先も「個人の生物学」ではない。</figcaption>
+</figure>
+
+<h3>結果 5｜ICC も、セットの中身と無関係な水準に張り付いていた</h3>
+<table>
+  <thead><tr><th style="width:56%">測定した量</th><th class="num">値</th></tr></thead>
+  <tbody>
+    <tr><td>注釈セット 2,093 件の ICC の中央値</td><td class="num">0.401</td></tr>
+    <tr><td>同サイズ・同発現量のランダム対照の ICC の中央値</td><td class="num"><strong>0.422</strong></td></tr>
+    <tr><td>ICC が 0.5 を超えた注釈セット</td><td class="num">23.0%</td></tr>
+    <tr><td><strong>ICC が自分の対照を有意に上回った注釈セット</strong></td><td class="num"><strong>15 / 2,093（0.7%）</strong></td></tr>
+  </tbody>
+</table>
+<p>対照を上回った 15 件の内訳は、細胞種マーカー 13 件と反応経路 2 件。上位は Neutrophils（0.641）、Megakaryocytes（0.633）、Platelets（0.596）、Monocytes（0.582）。<strong>7 日間隔で安定して再現する個人特性は、血球組成である。</strong></p>
+
+<figure>
+  <img src="../results/figures/fig5_retest_nonspecific.png" alt="注釈セットとランダム対照のICCの散布図">
+  <figcaption>図 5。横軸が各セットに対応するランダム対照の ICC、縦軸が注釈セット自身の ICC。破線は「注釈セット = ランダム対照」の線。<strong>点が破線上に分布する＝同サイズのランダムな遺伝子でも同じ再現性が得られる。</strong></figcaption>
+</figure>
+
+<p class="note"><strong>枠組みが正しく作動していることの確認。</strong>"Monocytes" のマーカー集合は、精製 CD14+ 単球では対照を上回らず（組成が動かないため）、PBMC では内部整合性でも ICC でも対照を上回った（組成が個人間で変わるため）。事前に予想できる振る舞いを指標が再現した。</p>
+
+<h3>結果 6｜ワクチン応答との相関は、採血日を変えると別のセットに移った</h3>
+<table>
+  <thead><tr><th style="width:52%">測定した量</th><th class="num">day0 の採血</th><th class="num">day-7 の採血</th></tr></thead>
+  <tbody>
+    <tr><td>自分のランダム対照を 2 標準偏差以上上回ったセット</td><td class="num">147 件</td><td class="num">154 件</td></tr>
+    <tr><td colspan="3"><strong>両方の採血で上回ったセット: 14 件（独立と仮定した偶然の期待値 11 件）</strong></td></tr>
+    <tr><td>BH-FDR 0.05 を通ったセット</td><td class="num">0 件</td><td class="num">—</td></tr>
+    <tr><td>全 2,093 セットの |rho| の中央値</td><td class="num">0.147</td><td class="num">0.081</td></tr>
+    <tr><td>同サイズ・同発現量のランダム対照の |rho| の中央値</td><td class="num"><strong>0.143</strong></td><td class="num"><strong>0.090</strong></td></tr>
+  </tbody>
+</table>
+<p>下の 2 行が答えを与える。<strong>注釈セットとランダム対照が、採血日ごとに同じ向きに同じ幅で動いている。</strong>対照に対する超過の中央値は day0 で +0.005、day-7 で −0.008 にすぎない。<strong>この差はその採血の発現行列全体の性質であって、遺伝子セットが何を含んでいるかとは関係がない。</strong></p>
+<p>本研究自身の予測も外れた。結果 5 で ICC が対照を上回った 15 件は、day0 では |rho| の中央値 0.393（残りは 0.146）だったのに、day-7 では 0.059 に落ち、対照超過の z は 3.10 から −0.41 になる。さらにこの 15 件は独立ではない（13 件が細胞種マーカーで、合計 1,984 遺伝子のうち重複を除くと 826 遺伝子）。<strong>1 つの所見が 13 回数えられていた。</strong></p>
+
+<figure>
+  <img src="../results/figures/fig6_phenotype_rerandomized.png" alt="2回の採血における対照超過の比較">
+  <figcaption>図 6。横軸が day0 の採血での応答クラスとの相関の対照超過、縦軸が同じ 42 人を 7 日前に測った同じ量。どちらも接種前の採血である。<strong>右上に点がほとんどない</strong>のが結論。</figcaption>
+</figure>
+
+<h2>10. 指標の絶対値が信用できない理由</h2>
+
+<div class="claim">
+  内部整合性、Cronbach alpha、ICC、表現型との相関——どの指標も、<strong>絶対値は遺伝子数と、その実験系で支配的なばらつき要因によって膨らむ。</strong>同じサイズ・同じ発現量のランダムな遺伝子集合と比較して初めて、そのセット固有の性質を語れる。
+</div>
+
+<svg viewBox="0 0 900 246" role="img" aria-label="注釈セットとランダム対照が同じ向きに動くことを示す棒グラフ">
+  <text x="0" y="16" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" fill="#161616">ワクチン応答クラスとの相関 |rho|（全 2,093 セットの中央値）</text>
+  <line x1="118" y1="196" x2="880" y2="196" stroke="#161616" stroke-width="1"/>
+  <line x1="118" y1="38" x2="118" y2="196" stroke="#161616" stroke-width="1"/>
+  <text x="110" y="200" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="#525252">0</text>
+  <text x="110" y="122" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="#525252">0.08</text>
+  <text x="110" y="46" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="#525252">0.16</text>
+  <line x1="118" y1="118" x2="880" y2="118" stroke="#e0e0e0"/>
+  <line x1="118" y1="42" x2="880" y2="42" stroke="#e0e0e0"/>
+  <rect x="184" y="51" width="86" height="145" fill="#161616"/>
+  <text x="227" y="43" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">0.147</text>
+  <rect x="290" y="55" width="86" height="141" fill="#e0e0e0" stroke="#161616"/>
+  <text x="333" y="47" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">0.143</text>
+  <text x="280" y="218" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#161616">day0 の採血</text>
+  <rect x="540" y="116" width="86" height="80" fill="#161616"/>
+  <text x="583" y="108" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">0.081</text>
+  <rect x="646" y="107" width="86" height="89" fill="#e0e0e0" stroke="#161616"/>
+  <text x="689" y="99" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#161616">0.090</text>
+  <text x="636" y="218" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="#161616">day-7 の採血（同じ 42 人）</text>
+  <rect x="184" y="234" width="13" height="10" fill="#161616"/>
+  <text x="204" y="243" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#525252">注釈された遺伝子セット</text>
+  <rect x="370" y="234" width="13" height="10" fill="#e0e0e0" stroke="#161616"/>
+  <text x="390" y="243" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#525252">サイズ・発現量マッチ対照</text>
+</svg>
+<p class="note">黒（注釈セット）と灰（ランダム対照）が、採血日ごとに同じだけ上下している。上下の原因は採血側にあり、セットの中身ではない。</p>
+
+<h4>Cronbach alpha も同じ構造で膨らむ</h4>
+<p>Cronbach alpha は平均項目間相関 r とセットサイズ g の関数（α = gr / (1 + (g−1)r)）なので、r が小さくても g が大きければ高く出る。100 遺伝子以上のセットの alpha 中央値 0.804 に対し、同サイズのランダム対照から計算される期待値は 0.708 だった。<strong>alpha が 0.7 を超えた 333 セットのうち 157 件（47.1%）は、対照と区別できない。</strong>しかも r 自体が測定チップ由来の技術的共変動で押し上げられているので、この膨張は<strong>サイズ × 技術的共変動の積</strong>である。</p>
+
+<h4>スコアリング手法を変えて順位が変わったときの解釈</h4>
+<p>手法間の順位一致度は内部整合性と Spearman 相関 0.565 を示した。内部整合性 0.02 未満のセット（845 件）では、4 手法のうち最も食い違う 2 手法の個人順位相関が中央値 <strong>−0.060</strong>。内部整合性 0.30 以上のセット（74 件）では 0.812 になる。<strong>手法を変えて結論が変わるのは、手法の問題ではなくセットがまとまっていない兆候である。</strong></p>
+
+<h2>11. 個人層別化にセットスコアを使う研究が報告すべき 4 点</h2>
+<p>いずれも<strong>絶対値ではなく、サイズと発現量をそろえたランダム対照との差</strong>で報告することが条件になる。</p>
+<ol>
+  <li><strong>内部整合性</strong>を、サイズ・発現量マッチ対照と比較して報告する</li>
+  <li><strong>反復測定信頼性（ICC）</strong>を、同じ対照と比較して報告する（絶対値の ICC は情報量を持たない）</li>
+  <li>観測された内部整合性が、そのセットが対象とする生物学に<strong>帰属できる</strong>ことを示す（対象組織に存在しない細胞種のセットが同程度に整合的でないことの確認を含む）</li>
+  <li>主成分と<strong>測定バッチ・細胞組成</strong>の関係を確認する（1 個人 = 1 チップの設計は珍しくなく、全血であれば血球組成が支配する）</li>
+</ol>
+<p>加えて、<strong>表現型との相関を主張する場合は、独立した 2 回目の測定で同じ相関が得られることを示す必要がある。</strong>これは結果 6 から直接導かれる要求である。</p>
+
+<h2>12. 原稿の点検</h2>
+
+<p>投稿前に、原稿そのものが壊れていないかを 3 本立てで検査した。<strong>主張の中身を変える作業ではなく、配管の点検である。</strong></p>
+
+<table>
+  <thead><tr><th style="width:20%">検査</th><th style="width:16%">状態</th><th>やったこと・見つかったこと</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数値の照合</strong></td><td>完了<br>必須 59 / 59 一致</td><td>原稿の全数値を解析出力の CSV と機械照合した。<strong>原稿の数値をスクリプトに書き写すと、その転記自体が新しいミス源になる</strong>ので、CSV から真の値を計算して原稿本文を検索する方式にした。<code>pixi run audit</code> でいつでも再実行できる。<strong>ここで上記の集計方法の不統一（4.199 対 1.510）を検出した。</strong></td></tr>
+    <tr><td><strong>引用の実在性</strong></td><td>完了<br>9 / 9 実在</td><td>PubMed で全件照合。捏造ゼロ、誤帰属ゼロ。さらに<strong>本文での使われ方</strong>を出典の全文に当たって確認し、先行ベンチマークの扱いに 2 件の不正確を見つけて修正した（上の 5 節を参照）。記録は <code>manuscript/03-引用検証ログ.md</code></td></tr>
+    <tr><td><strong>AI 検出器</strong></td><td><strong>未実施</strong></td><td>GPTZero・Copyleaks などの外部サービスは解析環境から呼べないため、<strong>人が実行する必要がある</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>13. 資料の所在と再現手順</h2>
+<table>
+  <thead><tr><th style="width:32%">対象</th><th>ファイル</th></tr></thead>
+  <tbody>
+    <tr><td><strong>投稿原稿（日本語・Word）</strong></td><td><code>manuscript/02-投稿原稿_日本語_v1.docx</code>（図 7 点・表 6 点を本文に埋め込み済み。原本は同名の <code>.md</code>）</td></tr>
+    <tr><td>引用検証ログ</td><td><code>manuscript/03-引用検証ログ.md</code></td></tr>
+    <tr><td>作業ドラフト（詳細版）</td><td><code>manuscript/01-論文ドラフト.html</code>（実測と仮説をタグで区別）</td></tr>
+    <tr><td>投稿からアクセプトまでの計画</td><td><code>docs/05-研究計画_投稿からアクセプトまで.html</code></td></tr>
+    <tr><td>WP1（RNA-seq 再現）の結果</td><td><code>docs/06-WP1結果_RNAseq再現.html</code></td></tr>
+    <tr><td>共同研究相談用の 3 ページ版</td><td><code>docs/03-コンセプトペーパー.html</code></td></tr>
+    <tr><td>先行研究との距離の判定</td><td><code>docs/01-先行研究の距離判定.html</code></td></tr>
+    <tr><td>図 7 枚</td><td><code>results/figures/</code></td></tr>
+    <tr><td>全数値（1 行 = 1 遺伝子セット）</td><td><code>results/tables/</code>（コホート別のサブディレクトリを含む）</td></tr>
+  </tbody>
+</table>
+<p>使用データはすべて公開アクセッションで、取得元・取得日・sha256 を <code>data/checksums/provenance.jsonl</code> に記録している。再現は次の順に実行する。</p>
+<p><strong>主コホート:</strong> <code>pixi run test</code>（合成データによる指標の妥当性検証 11 件）→ <code>download</code> → <code>preprocess</code> → <code>modules</code> → <code>validation</code> → <code>analyze</code> → <code>attribution</code> → <code>batch</code> → <code>retest</code> → <code>phenotype</code> → <code>technical</code> → <code>figures</code></p>
+<p><strong>WP1（RNA-seq）:</strong> <code>wp1-preprocess</code> → <code>wp1-modules</code> → <code>wp1-analyze</code> → <code>wp1-attribution</code>／<code>wp1-gtex-preprocess</code> → <code>wp1-gtex-attribution</code></p>
+<p><strong>原稿:</strong> <code>pixi run audit</code>（数値照合）→ <code>pixi run docx</code>（Word 生成）</p>
+
+</div>
+<footer class="doc">
+  <div class="wrap">
+    <h4>遺伝子セットスコアで個人を順位づけできるか — ここまでの成果</h4>
+    <p>数値はすべて <code>results/tables/</code> の解析結果に基づき、<code>pixi run audit</code> で原稿との一致を機械照合している（必須 59 / 59 一致）。図は研究本体と同一の出力。</p>
+    <p>使用データ: E-MTAB-2232（ArrayExpress）、GSE47353・GSE35846・GSE81046（GEO）、GTEx v8（GTEx Portal）、CORUM / Reactome / MSigDB Hallmark / TRRUST / PanglaoDB（Enrichr 経由）。文献情報は PubMed および PubMed Central により確認（2026-08-08、9 件すべて実在・メタデータ一致）。</p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WP1 結果 — RNA-seq での再現</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--canvas:#ffffff;--surface-1:#f4f4f4;--surface-2:#e0e0e0;--hairline:#e0e0e0;
+ --ink:#161616;--ink-muted:#525252;--ink-subtle:#8c8c8c;--primary:#0f62fe;--blue-60:#0043ce;
+ --success:#24a148;--error:#da1e28;--inverse-canvas:#161616;--inverse-ink:#ffffff;--inverse-ink-muted:#c6c6c6;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--canvas);color:var(--ink);
+ font-family:'IBM Plex Sans','Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;
+ font-size:16px;line-height:1.75;letter-spacing:0.16px;}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px;}
+header.doc{padding:48px 0 20px;}
+.eyebrow{font-size:14px;color:var(--ink-muted);margin:0 0 8px;}
+h1{font-size:33px;font-weight:300;line-height:1.25;margin:0 0 14px;letter-spacing:0;}
+.lede{font-size:18px;color:var(--ink-muted);margin:0 0 8px;line-height:1.6;}
+.meta{font-size:12px;color:var(--ink-subtle);letter-spacing:0.32px;margin-top:20px;}
+h2{font-size:25px;font-weight:400;margin:50px 0 16px;padding-top:10px;border-top:1px solid var(--hairline);}
+h3{font-size:19px;font-weight:600;margin:30px 0 10px;line-height:1.45;}
+h4{font-size:16px;font-weight:600;margin:22px 0 6px;}
+p{margin:0 0 16px;}
+a{color:var(--primary);} a:hover{color:var(--blue-60);}
+.claim{border-left:4px solid var(--ink);padding:18px 0 18px 22px;margin:22px 0;font-size:17px;}
+.verdict{border:1px solid var(--ink);padding:24px 26px;margin:24px 0;}
+.verdict h3{margin:0 0 12px;font-size:18px;}
+table{width:100%;border-collapse:collapse;margin:18px 0 26px;font-size:14px;letter-spacing:0.16px;line-height:1.6;}
+th{text-align:left;font-weight:600;border-bottom:2px solid var(--ink);padding:10px 10px 8px;vertical-align:bottom;}
+td{border-bottom:1px solid var(--hairline);padding:10px;vertical-align:top;}
+tbody tr:nth-child(even){background:var(--surface-1);}
+.num{text-align:right;font-family:'IBM Plex Mono','SF Mono',Consolas,monospace;}
+.ok{color:var(--success);font-weight:600;}
+.ng{color:var(--error);font-weight:600;}
+.wn{color:#8a6d00;font-weight:600;}
+ul,ol{margin:0 0 16px;padding-left:22px;} li{margin-bottom:9px;}
+code{font-family:'IBM Plex Mono','SF Mono',Consolas,monospace;font-size:13px;background:var(--surface-1);padding:1px 5px;}
+.note{font-size:14px;color:var(--ink-muted);border-left:1px solid var(--hairline);padding-left:16px;margin:0 0 18px;}
+footer.doc{background:var(--inverse-canvas);color:var(--inverse-ink-muted);margin-top:56px;padding:32px 0;}
+footer.doc h4{color:var(--inverse-ink);font-weight:400;font-size:16px;margin:0 0 8px;}
+footer.doc p{font-size:13px;margin:0 0 6px;}
+@media (prefers-color-scheme: dark){
+ :root{--canvas:#161616;--surface-1:#262626;--surface-2:#393939;--hairline:#393939;
+ --ink:#ffffff;--ink-muted:#c6c6c6;--ink-subtle:#8d8d8d;--primary:#4589ff;}}
+@media print{h2{page-break-after:avoid;}footer.doc{background:none;color:#000;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">個人研究 T26 ／ WP1 結果</p>
+  <h1>RNA-seq での再現</h1>
+  <p class="lede">「マイクロアレイだけの現象ではないか」を潰す。結果 4（整合性の帰属）は 3 種類目の攪乱要因で再現し、結果 1（乖離）は大きさが縮んだ</p>
+  <p class="meta">2026-08-05 実施 ／ GSE81046（マクロファージ RNA-seq、166 名 × 3 条件）と GTEx v8 全血（RNA-seq、755 検体）／ 再現: <code>pixi run wp1-preprocess → wp1-modules → wp1-analyze → wp1-attribution</code>、<code>wp1-gtex-preprocess → wp1-gtex-attribution</code></p>
+</header>
+
+<div class="verdict">
+  <h3>ゲート判定: <span class="wn">部分的に再現</span> — 続行</h3>
+  <p style="margin:0 0 10px;">計画（<code>docs/05</code>）の停止条件は「乖離自体が再現しない」だったが、該当しない。条件効果はほぼ普遍（88.3%）で、整合性はそれより明確に少なく（27.4%）、最大の区画は「条件効果のみ」（64.4%）のままである。</p>
+  <p style="margin:0;">ただし<strong>「8 割が使えない」という見出しはマイクロアレイ固有</strong>と判明したため、主張を「割合はデータセット依存、方向と帰属は普遍」に限定する。</p>
+</div>
+
+<h2>1. 何を確かめたか</h2>
+<table>
+  <thead><tr><th style="width:24%">データ</th><th style="width:30%">構成</th><th>担当する所見</th></tr></thead>
+  <tbody>
+    <tr><td><strong>GSE81046</strong><br><span style="color:var(--ink-subtle)">Nédélec et al. Cell 2016</span></td><td>初代マクロファージ RNA-seq、480 検体・165 名。非感染 / Listeria / Salmonella（2h）。アフリカ系 36 名・ヨーロッパ系 43 名（検証側）</td><td>結果 1（乖離）、結果 2（ファミリー比較）、結果 4（帰属）</td></tr>
+    <tr><td><strong>GTEx v8 全血</strong></td><td>RNA-seq 755 検体。RIN 値・虚血時間・発現バッチ・抽出バッチ・採取施設・年齢・性別・死因分類を公開</td><td>結果 4（帰属）を n 約 4 倍・共変量豊富で再現</td></tr>
+  </tbody>
+</table>
+<p class="note">解析コードは 1 行も変更していない。環境変数 <code>T26_DATASET</code> で入出力の名前空間を切り替え、設定ファイルだけを差し替える設計にしたため、「結果の違いはデータの違いにのみ由来する」と言える。</p>
+
+<h2>2. 途中で 2 回、前処理を直した</h2>
+<p>どちらも<strong>自分の論文の主張に抵触する</strong>ものだった。RNA-seq へ移すときに、マイクロアレイ用の規則をそのまま持ち込めない箇所である。</p>
+
+<h4>修正 1: 発現フィルタ（分位規則 → 絶対量規則）</h4>
+<p>分位規則をそのまま適用すると、中位数が TPM 0.01 付近に来て <strong>25,046 遺伝子</strong>が残った。RNA-seq の 57,905 features には lncRNA や偽遺伝子が大量に含まれるためである。未発現遺伝子の個人間分散は測定ノイズなので、これを残すと「共発現しない」という結論が検出限界の産物になる（論文 §4.5 R3 で自ら立てた反論に抵触する）。標準規則（CPM ≥ 1 を過半数の個人で満たす）に変更し、<strong>11,623 遺伝子</strong>——主コホート（10,754）と同水準になった。</p>
+
+<h4>修正 2: 定量方式（TPM → TMM log-CPM）</h4>
+<p>TPM のままだと第 1 主成分が全分散の <strong>45.3%</strong> を占め、それが<strong>各検体の平均発現量と ρ = 0.977</strong> だった。これは「発現が何遺伝子に集中しているか」という複雑度の差であって生物学ではない。結果としてランダム対照の内部整合性が <strong>0.168</strong> まで底上げされていた。</p>
+<p>比較は<strong>同じ 11,623 遺伝子・同じ 79 名に固定し、定量と正規化だけを差し替えて</strong>行った（発現フィルタの効果と正規化の効果を分離するため）。主成分の符号は数値計算上不定なので、平均発現量と正相関する向きにそろえてある。</p>
+<table>
+  <thead><tr><th style="width:30%">定量方式</th><th class="num">PC1 の寄与率</th><th class="num">平均発現量との ρ</th><th class="num">検出率との ρ</th><th class="num">ランダム対照の整合性</th></tr></thead>
+  <tbody>
+    <tr><td>TPM そのまま</td><td class="num">45.3%</td><td class="num">0.977</td><td class="num">0.600</td><td class="num">0.168</td></tr>
+    <tr><td>TPM + 分位正規化</td><td class="num">35.4%</td><td class="num">0.794</td><td class="num">0.559</td><td class="num">0.002</td></tr>
+    <tr><td><strong>TMM log-CPM（採用）</strong></td><td class="num">35.5%</td><td class="num">0.626</td><td class="num">0.585</td><td class="num"><strong>0.012</strong></td></tr>
+  </tbody>
+</table>
+<p><strong>どの正規化でも検出率との関連は消えない</strong>（|ρ| = 0.600 / 0.559 / 0.585）。変わるのは<strong>ランダム対照の水準で、0.002 から 0.168 まで 70 倍動く</strong>。つまり内部整合性の絶対値は、その研究がどの正規化を選んだかでほぼ決まる。<strong>これ自体が本研究の中心主張（絶対値ではなく対照との差で報告する）の直接的な例証になる。</strong>共発現解析の分野標準である TMM log-CPM（edgeR）を主経路にした。</p>
+<p class="note"><strong>訂正（2026-08-08）。</strong>以前この表は TMM の行に「検出率との ρ = −0.209、対照 0.003」と書いていたが、これは分位正規化された古い行列で測った値だった。遺伝子集合を固定して再測定した上の値が正しい。再現は <code>pixi run wp1-normalization</code>。</p>
+
+<h2>3. 結果 4（帰属）は 3 種類目の攪乱要因で再現した</h2>
+
+<div class="claim">
+  精製単球では測定チップ、全血では血球組成、マクロファージでは培養状態——<strong>実験系ごとに正体は違うが、支配軸がそのセットの名乗る生物学ではない点は一貫している。</strong>
+</div>
+
+<h3>GSE81046: ラベルと遺伝子内容が対応しないセットが上位に並ぶ現象も再現</h3>
+<p>細胞種マーカーで内部整合性が高いのは <strong>Reticulocytes（0.326）・Pluripotent Stem Cells（0.301）・Undefined Placental Cells（0.192）・Spermatozoa（0.146）</strong>。<strong>これはラベルの細胞種がマクロファージに混ざっているのではなく、遺伝子内容がラベルと対応していない。</strong>Reticulocytes は翻訳と核膜孔でヘモグロビン遺伝子を 1 つも含まず、Pluripotent Stem Cells は細胞周期、Spermatozoa は C1QA/B/C・CD14・CD163 を含む初代マクロファージのプログラムである。マイクロアレイでの Hemangioblasts・Trophoblast Progenitor Cells・Reticulocytes と同じ現象が、別プラットフォーム・別細胞で再現した。整合性はラベルではなく遺伝子内容に対応する。</p>
+<p>雑音軸（単球サブセット／血小板／赤血球／リンパ球／全遺伝子の第 1 主成分）を全部抜いたときの変化を、両プラットフォームで同じ定義で比べる。</p>
+<table>
+  <thead><tr><th>ファミリー</th><th class="num">整合性（軸あり）</th><th class="num">全軸除去後</th><th class="num">変化</th><th class="num">アレイでの変化</th></tr></thead>
+  <tbody>
+    <tr><td>転写因子 regulon</td><td class="num">0.061</td><td class="num">0.037</td><td class="num">−40%</td><td class="num">−9%</td></tr>
+    <tr><td>反応経路（Reactome）</td><td class="num">0.091</td><td class="num">0.066</td><td class="num">−27%</td><td class="num">−22%</td></tr>
+    <tr><td>発現シグネチャ（Hallmark）</td><td class="num">0.070</td><td class="num">0.057</td><td class="num">−18%</td><td class="num">−15%</td></tr>
+    <tr><td>タンパク質複合体（CORUM）</td><td class="num">0.116</td><td class="num">0.110</td><td class="num">−5%</td><td class="num">+7%</td></tr>
+    <tr><td><strong>データ由来モジュール</strong></td><td class="num">0.370</td><td class="num">0.350</td><td class="num"><strong>−5%</strong></td><td class="num"><strong>−12%</strong></td></tr>
+    <tr><td>細胞種マーカー</td><td class="num">0.046</td><td class="num">0.053</td><td class="num"><strong>+16%</strong></td><td class="num">−47%</td></tr>
+  </tbody>
+</table>
+<p>注釈由来のセットが雑音軸で目減りする点は再現した。<strong>ただし細胞種マーカーだけは符号が反転し、RNA-seq では軸を抜くと逆に上がる。</strong>除去した軸が集合内を分断していた場合に起こりうる挙動であり、細胞種マーカーの整合性を雑音軸の寄与だけで説明することはできない。</p>
+<p class="note"><strong>訂正（2026-08-08）。</strong>以前この表は「Reactome −53%、Hallmark −52%、regulon −63%、細胞種 −51%、データ由来 −8%」で、アレイ側の列には<strong>全遺伝子第 1 主成分だけを抜いた値</strong>を並べていた。除去する軸の数が違う値を横に並べていたことになる。上の表は両側とも全軸除去に統一してある。</p>
+
+<h3>設計した生物学でさえ、支配軸ではない</h3>
+<p>GSE81046 はアフリカ系とヨーロッパ系の免疫応答差を調べるために設計されたコホートである。にもかかわらず、<strong>祖先集団は PC1（全分散の 35.5%）の 2.0% しか説明しない</strong>（ラベル並べ替え検定 p = 0.23）。PC1〜PC5 のいずれでも説明率は 0.1〜2.9% にとどまった。</p>
+
+<h3>GTEx: 血球組成 &gt; 技術 &gt; 個人属性 が RNA-seq でも成立</h3>
+<p>755 検体・PC1〜PC5 について、ラベル並べ替えの偶然水準を引いた超過説明率を分類ごとに集計した。集計は各主成分の寄与率で重み付けしている（単純に足すと寄与率 3.3% の PC5 が 29.3% の PC1 と同じ重みになり、主成分構造の違うコホート同士を比べられなくなるため）。</p>
+<table>
+  <thead><tr><th style="width:22%">分類</th><th class="num" style="width:18%">超過説明率（加重）</th><th>主な要因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>血球組成</strong></td><td class="num"><strong>1.510</strong></td><td>好中球 +0.396、血小板 +0.348、単球 +0.310、NK +0.270、naive T +0.122、B +0.064</td></tr>
+    <tr><td>技術</td><td class="num">0.594</td><td><strong>虚血時間 +0.329</strong>、採取施設 +0.099、RIN 値 +0.072、発現バッチ +0.064、抽出バッチ +0.029</td></tr>
+    <tr><td>生物学</td><td class="num">0.388</td><td><strong>死因分類 +0.326</strong>、年齢 +0.056、性別 +0.005</td></tr>
+  </tbody>
+</table>
+<p>PC1（全分散の 29.3%）だけを見ると、好中球比率が R² = 0.787（偶然水準 0.005）、血小板 0.677、<strong>虚血時間 0.640</strong>、死因分類 0.623 で説明される。</p>
+<p><strong>「生物学」の 0.388 のうち 0.326 は死因分類</strong>で、これはドナーがどう亡くなったかという状況であって、安定した個人特性ではない。<strong>安定した個人特性と言える年齢と性別は、合わせて 0.061 しかない。</strong></p>
+<table>
+  <thead><tr><th style="width:34%">コホート</th><th class="num">血球組成</th><th class="num">技術</th><th class="num">年齢＋性別</th></tr></thead>
+  <tbody>
+    <tr><td>GSE35846（マイクロアレイ全血、189 名）</td><td class="num">1.053</td><td class="num">0.125</td><td class="num">0.028</td></tr>
+    <tr><td>GTEx v8（RNA-seq 全血、755 検体）</td><td class="num">1.510</td><td class="num">0.594</td><td class="num">0.061</td></tr>
+  </tbody>
+</table>
+<p class="note">2 つのコホートは同じ集計方法（寄与率で加重）で計算しており、値を直接比較できる。順序（血球組成 &gt; 技術 &gt; 年齢＋性別）は測定方式によらず一致する。</p>
+<p class="note">虚血時間は他のコホートにない軸で、死後・採取後の時間経過という「生物学とも技術ともつかない要因」である。これが PC1 の 64% を説明したことは、<strong>「支配軸はその実験系で最大の攪乱要因」という主張をさらに補強する</strong>。GTEx を個人層別化に使う研究は多いが、この軸を調整せずに個人の経路活性を語ることはできない。</p>
+
+<h2>4. 結果 1（乖離）は方向が再現、大きさは縮んだ</h2>
+<table>
+  <thead><tr><th style="width:36%">区画</th><th class="num">GSE81046（RNA-seq）</th><th class="num">主コホート（マイクロアレイ）</th></tr></thead>
+  <tbody>
+    <tr><td>評価セット</td><td class="num">2,514</td><td class="num">2,195</td></tr>
+    <tr><td>条件効果あり</td><td class="num">88.3%</td><td class="num">90.8%</td></tr>
+    <tr><td>個人整合性あり（両対照）</td><td class="num">27.4%</td><td class="num">4.6%</td></tr>
+    <tr><td><strong>条件効果のみ＝層別化不可</strong></td><td class="num"><strong>64.4%</strong></td><td class="num"><strong>86.7%</strong></td></tr>
+    <tr><td>（雑音軸除去後）条件効果のみ</td><td class="num">60.5%</td><td class="num">73.4%</td></tr>
+  </tbody>
+</table>
+<p>条件効果の割合はほぼ同じだが、整合性の合格率が 4.6% → 27.4% に上がったため乖離が縮んだ。<strong>培養マクロファージ（6 日間の in vitro 分化）の分化状態の個人差が強い共発現構造を作っている</strong>ためと考えている。ただしその構造は雑音軸の除去で目減りする（regulon −40%、Reactome −27%、Hallmark −18%）ので、<strong>そのセットの生物学に帰属できる整合性とは言えない</strong>。</p>
+
+<h4>ファミリー順位は、サイズ帯をそろえると保たれる</h4>
+<p>データ由来モジュールが最上位（アレイ 0.364 / RNA-seq 0.370）である点は一致した。<strong>一方、ファミリーの順位そのものは、サイズ帯を混ぜると保存されない</strong>（超過分の Spearman <strong>0.143</strong>、p = 0.79／参照アンカーを除いて +0.26）。RNA-seq では参照アンカーが第 2 位、タンパク質複合体が第 3 位に上がり、アレイで第 2 位だった細胞種マーカーが最下位に落ちる。</p>
+<p><strong>ただしサイズ帯をそろえると順位は保たれる。</strong>26〜60 遺伝子の帯に限ると超過分の順位相関は <strong>0.900</strong>（p = 0.037）、整合性の中央値では 1.000 になる。11〜25 帯ではいずれも 0.800（p = 0.20、4 ファミリー）である。<strong>順位が保存されないように見えるのは、サイズ帯を混ぜたことの産物だった。</strong>対照を上回る割合はセットが大きいほど上がるので、サイズ帯をまたいでファミリーを比べると大きいセットの多いファミリーが上に来る。</p>
+<p class="note"><strong>訂正（2026-08-08）。</strong>以前ここには「順位相関 Spearman +0.829（p = 0.042）」と書いていたが、これは分位正規化された古い行列での値だった。正しい行列では順位は保存されない。本文の主張も「データ由来モジュール以外は対照との差が小さいか不安定」までに限定した。</p>
+<p class="note"><strong>更新（2026-08-24）。</strong>サイズ帯で層別した解析を入れたので、この節の結論が変わった。サイズ帯を混ぜたときの順位相関も対照 10,000 個での再計算で +0.00 から 0.143 に動いている。論文本文の該当箇所は 3.8 節。</p>
+<table>
+  <thead><tr><th style="width:16%">コホート</th><th>内部整合性の中央値による順位</th></tr></thead>
+  <tbody>
+    <tr><td>RNA-seq</td><td>データ由来 (0.354) &gt; 細胞種 (0.085) &gt; 経路 (0.083) &gt; 複合体 (0.078) &gt; regulon (0.077) &gt; シグネチャ (0.067)</td></tr>
+    <tr><td>マイクロアレイ</td><td>データ由来 (0.364) &gt; 細胞種 (0.051) &gt; 経路 (0.032) &gt; シグネチャ (0.024) &gt; 複合体 (0.023) &gt; regulon (0.008)</td></tr>
+  </tbody>
+</table>
+
+<h2>5. 主張の書き換え</h2>
+<div class="claim">
+  <strong>書き換え前</strong>: 条件効果があるセットの 86.7% は個人層別化に使えない<br>
+  <strong>書き換え後</strong>: 条件効果はどのデータでもほぼ普遍（88〜91%）。個人整合性の割合はデータセット依存（5〜27%）。<strong>しかし「見かけの整合性の主因はセットが名乗る生物学ではない」は、4 コホート・4 種類の攪乱要因（測定チップ／血球組成／培養状態／虚血時間）で一貫して再現する。</strong>
+</div>
+<p>この書き換えは論文にとって弱体化ではない。<strong>「割合」を主張の中心から外し、「帰属」を中心に据える</strong>ことで、データセット依存性という反論をあらかじめ吸収できる。単一コホートの割合を売りにしていたら、査読で「別のデータでは違うのでは」と突かれて終わっていた。</p>
+
+<h2>6. 次の作業</h2>
+<ol>
+  <li><strong>論文ドラフトの改稿。</strong>§3.1 の見出し数値を範囲表記に、§3.7 に GSE81046 と GTEx を追加、§4.4 L2（プラットフォーム）を解消済みに更新</li>
+  <li><strong>WP3a 英文原稿（プレプリント v1 用）。</strong>9 月から着手する予定を前倒しできる状態にある</li>
+  <li><strong>WP2 事前登録。</strong>採点を始める前に OSF へ</li>
+  <li>感度分析: 発現フィルタを CPM ≥ 0.5 / 2.0 に振る（<code>expr_full.parquet</code> を保存済みなので tar の読み直しは不要）</li>
+</ol>
+
+</div>
+<footer class="doc">
+  <div class="wrap">
+    <h4>WP1 結果 — RNA-seq での再現</h4>
+    <p>数値は <code>results/tables/gse81046/</code> と <code>results/tables/gtex_blood/</code> の出力に基づく。解析コードは主コホートと同一で、<code>T26_DATASET</code> による名前空間切り替えと設定ファイルの差し替えのみで実行している。</p>
+    <p>使用データ: GSE81046（GEO、Nédélec et al. Cell 2016）、GTEx v8（Google Cloud 公開バケット）。いずれも認証不要で取得でき、取得元・取得日・sha256 を <code>data/checksums/provenance.jsonl</code> に記録済み。2026-08-05 作成</p>
+  </div>
+</footer>
+</body>
+</html>

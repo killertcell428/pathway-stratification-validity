@@ -1,0 +1,23 @@
+{
+  "ifn24": {
+    "n_genes": 8604,
+    "n_individuals": 367
+  },
+  "lps2": {
+    "n_genes": 8604,
+    "n_individuals": 261
+  },
+  "lps24": {
+    "n_genes": 8604,
+    "n_individuals": 322
+  },
+  "naive": {
+    "n_genes": 8604,
+    "n_individuals": 414
+  },
+  "overlap_with_resting": {
+    "ifn24": 363,
+    "lps2": 258,
+    "lps24": 318
+  }
+}

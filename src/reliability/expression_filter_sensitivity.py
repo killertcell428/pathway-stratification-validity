@@ -45,16 +45,26 @@ def summarize(df: pd.DataFrame) -> dict:
 
 
 def main() -> int:
-    rows, family = {}, {}
+    rows, family, n_ctrl = {}, {}, {}
     for label, suffix in LEVELS:
         path = TABLES / f"gene_set_metrics{suffix}.csv"
         if not path.exists():
             print(f"★ 見つからない: {path.name}（その水準の走行が済んでいない）")
             return 1
         df = pd.read_csv(path)
+        # 対照数がそろっていない腕を混ぜると、閾値の効果ではなく対照数の効果を測る。
+        # 実測: 採用腕だけ 10,000 個にしたとき、採用腕 27.4% に対し両隣が
+        # 38.6% と 35.9%（対照 20 個のまま）で、採用値が外れ値に見える表ができた。
+        n_ctrl[label] = int(df["n_control"].median()) if "n_control" in df.columns else 20
         rows[label] = summarize(df)
         both = (df.null_q < 0.05) & (df.var_null_q < 0.05)
         family[label] = (100 * df.assign(b=both).groupby("family").b.mean()).round(1)
+
+    if len(set(n_ctrl.values())) > 1:
+        print("★ 水準間で対照数がそろっていない:", n_ctrl)
+        print("  該当の水準を T26_MATRIX_SUFFIX を付けて run_evaluation で再走行すること")
+        return 1
+    print(f"（各水準の対照数: {next(iter(n_ctrl.values())):,} 個）")
 
     out = pd.DataFrame(rows).T
     print("=== 発現フィルタ閾値の感度分析（GSE81046, RNA-seq）===")
@@ -74,11 +84,23 @@ def main() -> int:
         print(f"  {label:20s} 条件効果 > 整合性: {'○' if c1 else '×'}"
               f" / 最大区画が「条件効果のみ」: {'○' if c2 else '×'}")
         ok = ok and c1 and c2
-    order = [fam[label].sort_values(ascending=False).index.tolist() for label in fam]
-    same_top = len({o[0] for o in order}) == 1
-    print(f"  ファミリー順位の最上位が 3 水準で一致: {'○' if same_top else '×'}"
-          f"（{sorted({o[0] for o in order})}）")
-    print(f"\n{'結論は閾値に依存しない' if ok and same_top else '★ 結論が閾値に依存する'}")
+    # 本文が主張しているのは「下位に来るのは複合体とレギュロン」である。
+    # 最上位の入れ替わりは合格率が 1 セット未満の差で決まることがあり
+    # （実測: CPM>=2.0 で signature 71.4%（35 件中 25）に対し
+    # data_derived 71.0%（31 件中 22））、それで「閾値に依存する」と出すと
+    # 狼少年になる。判定は下位 2 ファミリーの一致で行い、最上位は情報として出す。
+    ann = {label: fam[label].drop(index=[i for i in ("anchor",) if i in fam[label].index])
+           for label in fam}
+    bottoms = {label: tuple(sorted(v.nsmallest(2).index)) for label, v in ann.items()}
+    same_bottom = len(set(bottoms.values())) == 1
+    print(f"  下位 2 ファミリーが 3 水準で一致: {'○' if same_bottom else '×'}"
+          f"（{sorted(set(bottoms.values()))}）")
+    tops = {label: v.idxmax() for label, v in ann.items()}
+    if len(set(tops.values())) == 1:
+        print(f"  最上位も 3 水準で一致（{next(iter(set(tops.values())))}）")
+    else:
+        print(f"  最上位は水準で入れ替わる（{tops}）。合格率の差を確認すること")
+    print(f"\n{'結論は閾値に依存しない' if ok and same_bottom else '★ 結論が閾値に依存する'}")
 
     out.to_csv(TABLES / "expression_filter_sensitivity.csv", encoding="utf-8")
     fam.to_csv(TABLES / "expression_filter_sensitivity_by_family.csv", encoding="utf-8")

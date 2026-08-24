@@ -28,6 +28,7 @@ import pandas as pd
 from ..common import INTERIM, METADATA, TABLES, load_config, rng
 from ..download.fetch_gene_sets import parse_gmt
 from ..scoring.methods import _rank_rows, _standardize_rows
+from .metrics import draw_null_rho  # noqa: F401
 from .metrics import empirical_null, matched_random_sets, mean_pairwise_rho
 from .run_evaluation import load_all_sets
 
@@ -125,6 +126,12 @@ def main() -> int:
     all_sets = load_all_sets(gs_cfg)
     filt = gs_cfg["filters"]
     nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
+    pool_by_decile = {
+        int(d): np.array([index[g] for g in gs if g in index], dtype=np.int64)
+        for d, gs in by_dec.items()
+    }
+    for cond, mat in S.items():
+        assert not np.isnan(mat).any(), f"S[{cond}] に NaN。まとめ計算の前提が崩れる"
     gen = rng(7)
 
     rows = []
@@ -140,14 +147,13 @@ def main() -> int:
         rec = {"set": name, "family": family, "n_genes_present": len(present)}
         for cond, mat in S.items():
             rec[f"ic_{cond}"] = mean_pairwise_rho(mat[idx])
-        nulls_all = [
-            mean_pairwise_rho(S["all"][np.array([index[g] for g in rs], dtype=int)])
-            for rs in matched_random_sets(present, dec, by_dec, nc, gen)
-        ]
-        nn = empirical_null(rec["ic_all"], nulls_all)
+        dec_pos = np.array([dec[g] for g in present if g in dec], dtype=np.int64)
+        nulls_all = draw_null_rho(S["all"], pool_by_decile, dec_pos, nc, gen)
+        nn = empirical_null(rec["ic_all"], nulls_all.tolist())
         rec["null_all_mean"] = nn["null_mean"]
         rec["null_all_z"] = nn["null_z"]
         rec["null_all_p"] = nn["null_p"]
+        rec["null_all_p_empirical"] = nn["null_p_empirical"]
         rows.append(rec)
 
     df = pd.DataFrame(rows)

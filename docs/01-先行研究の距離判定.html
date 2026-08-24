@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>先行研究の距離判定 — 遺伝子セットスコアの個人層別化妥当性</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#ffffff; --surface-1:#f4f4f4; --surface-2:#e0e0e0;
+    --hairline:#e0e0e0; --ink:#161616; --ink-muted:#525252; --ink-subtle:#8c8c8c;
+    --primary:#0f62fe; --blue-60:#0043ce;
+    --inverse-canvas:#161616; --inverse-ink:#ffffff; --inverse-ink-muted:#c6c6c6;
+    --success:#24a148; --warning:#f1c21b; --error:#da1e28;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--canvas); color:var(--ink);
+    font-family:'IBM Plex Sans','Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;
+    font-size:16px; line-height:1.6; letter-spacing:0.16px; font-weight:400;
+  }
+  .wrap{max-width:960px; margin:0 auto; padding:0 24px;}
+  header.doc{padding:48px 0 32px;}
+  .eyebrow{font-size:14px; color:var(--ink-muted); margin:0 0 8px;}
+  h1{font-size:38px; font-weight:300; line-height:1.2; margin:0 0 12px; letter-spacing:0;}
+  .lede{font-size:18px; color:var(--ink-muted); margin:0;}
+  .meta{font-size:12px; color:var(--ink-subtle); letter-spacing:0.32px; margin-top:24px;}
+  h2{font-size:26px; font-weight:400; margin:48px 0 16px; letter-spacing:0;}
+  h3{font-size:19px; font-weight:600; margin:32px 0 8px;}
+  p{margin:0 0 16px;}
+  a{color:var(--primary); text-decoration:underline;}
+  a:hover{color:var(--blue-60);}
+  a:focus{outline:none; border-bottom:2px solid var(--ink);}
+  .band{background:var(--surface-1); padding:32px 0; margin:48px 0;}
+  .verdict{border-left:4px solid var(--ink); padding:16px 0 16px 20px; margin:0 0 24px;}
+  .verdict .label{font-size:14px; font-weight:600; color:var(--ink-muted); margin:0 0 4px;}
+  .verdict .body{margin:0;}
+  table{width:100%; border-collapse:collapse; margin:16px 0 24px; font-size:14px; letter-spacing:0.16px;}
+  th{text-align:left; font-weight:600; border-bottom:2px solid var(--ink); padding:10px 12px 8px; vertical-align:bottom;}
+  td{border-bottom:1px solid var(--hairline); padding:10px 12px; vertical-align:top;}
+  tbody tr:nth-child(even){background:var(--surface-1);}
+  .num{text-align:right; font-family:'IBM Plex Mono','SF Mono',Consolas,monospace;}
+  .tag{display:inline-block; font-size:12px; letter-spacing:0.32px; padding:2px 8px; border:1px solid var(--ink); }
+  .tag.alive{background:var(--ink); color:#fff;}
+  .tag.caution{background:var(--canvas); color:var(--ink);}
+  ul,ol{margin:0 0 16px; padding-left:22px;}
+  li{margin-bottom:8px;}
+  .quote{border-left:1px solid var(--hairline); padding:8px 0 8px 16px; color:var(--ink-muted); font-size:14px; margin:0 0 16px;}
+  code{font-family:'IBM Plex Mono','SF Mono',Consolas,monospace; font-size:13px; background:var(--surface-1); padding:1px 5px;}
+  details{border-top:1px solid var(--hairline); padding:12px 0;}
+  summary{cursor:pointer; font-weight:600; font-size:15px;}
+  .caption{font-size:12px; color:var(--ink-subtle); letter-spacing:0.32px; margin-top:-8px;}
+  footer.doc{background:var(--inverse-canvas); color:var(--inverse-ink-muted); margin-top:64px; padding:32px 0;}
+  footer.doc h4{color:var(--inverse-ink); font-weight:400; font-size:16px; margin:0 0 8px;}
+  footer.doc p{font-size:13px; margin:0 0 4px;}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --canvas:#161616; --surface-1:#262626; --surface-2:#393939;
+      --hairline:#393939; --ink:#ffffff; --ink-muted:#c6c6c6; --ink-subtle:#8d8d8d;
+      --primary:#4589ff;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc">
+    <p class="eyebrow">個人研究 T26 / 着手判断</p>
+    <h1>先行研究の距離判定</h1>
+    <p class="lede">遺伝子セットスコアの個人層別化妥当性という問いは、既発表のベンチマークと衝突するか</p>
+    <p class="meta">作成 2026-08-03 ／ 判定者: 研究提案者本人 ／ 対象: Toro-Domínguez et al. <em>Brief Bioinform</em> 2025;26(6) ほか周辺 4 検索</p>
+  </header>
+
+  <div class="verdict">
+    <p class="label">結論</p>
+    <p class="body"><strong>差別化 2 軸はどちらも生きている。加えて第 3 の空白が見つかった。</strong>ただし「手法の推奨」を再演すると正面衝突するため、遺伝子セットを評価対象・手法を共変量とする立て位置を明示する必要がある。</p>
+  </div>
+
+  <h2>要点</h2>
+  <ol>
+    <li><strong>先行研究は手法ベンチマークで、遺伝子セットの出自を比較していない。</strong>Toro-Domínguez らは SLE の 5 コホートに対し 18 手法（GSVA・ssGSEA・singscore・PLAGE・AUCell・M-Scores 他）を比較したが、使った遺伝子セットは SLE-Diseaseome の 5,212 セット 1 種類のみ。CORUM 複合体・Reactome 経路・Hallmark・regulon・細胞種マーカー・データ由来モジュールを横並びにした比較は存在しない。</li>
+    <li><strong>遺伝子セット側の操作はしているが、すべて合成操作である。</strong>やったのは「DB を 1〜1000 セットに間引いてスコアがぶれるか」と「ランダム遺伝子で作った偽セット（5/10/25/50/100 遺伝子）で偽陽性率を測る」の 2 つ。実在する遺伝子セットが個人の特性を測れるかは問われていない。</li>
+    <li><strong>摂動応答という次元が完全に欠けている。</strong>全解析が横断デザイン（SLE 患者 vs 健常）で、同一個人の刺激前後を扱っていない。「条件効果は測れるが個人層別化には使えない」という乖離は、原理的に検出できない設計になっている。</li>
+    <li><strong>第 3 の空白: 彼らの安定性は「入力条件を変えたときのスコアのぶれ」であって「同一個人を測り直したときの順位のぶれ」ではない。</strong>サンプルサイズ・欠測遺伝子・DB サイズ・バッチ統合に対する頑健性は測っているが、個人内の反復測定信頼性（test-retest / ICC）と、セット内遺伝子が個人間で共変動するか（内部整合性）は評価軸に入っていない。T26 が置く 4 軸のうち 2 軸が未踏。</li>
+    <li><strong>gap statement は彼ら自身の結果節（Gene set characteristics impact on score stability）から引ける。</strong>「遺伝子セット集合を選ぶ際のもう一つの考慮事項は、遺伝子セット注釈の正確さと信頼性である。遺伝子セットの出所は、精査され査読された経路データベースから、個々の論文由来のユーザー提供シグネチャまで幅がある」と書いており、そこから先を測っていない。</li>
+    <li><strong>危険な重なりは 1 点だけ。</strong>彼らは Table 2 で手法別に「individual/functional studies に推奨」まで書いている。T26 が手法比較を主軸にすると劣位の後追いになる。手法は 4 つに固定して共変量扱いにし、変数は遺伝子セットのファミリーに限定する。</li>
+  </ol>
+
+  <div class="band">
+    <div class="wrap">
+      <h2 style="margin-top:0">判定表</h2>
+      <table>
+        <thead>
+          <tr><th style="width:26%">軸</th><th style="width:12%">判定</th><th>根拠</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>軸 1: 手法ではなく遺伝子セットを評価対象にする</td>
+            <td><span class="tag alive">未踏</span></td>
+            <td>先行研究の遺伝子セットは単一集合（SLE-Diseaseome 5,212 セット）。ファミリー間比較はない。彼らの遺伝子セット操作は DB サイズの間引きとランダム偽セットのみで、実在セットの出自による違いは測っていない</td>
+          </tr>
+          <tr>
+            <td>軸 2: 静的状態と摂動応答を分けて評価する</td>
+            <td><span class="tag alive">未踏</span></td>
+            <td>全解析が患者 vs 健常の横断比較。刺激前後のペアデザインが 1 件もなく、条件効果と個人差の乖離という現象自体を扱えない</td>
+          </tr>
+          <tr>
+            <td>軸 3（新規発見）: 個人内の測定信頼性と内部整合性</td>
+            <td><span class="tag alive">未踏</span></td>
+            <td>彼らの「安定性」はデータ入力条件（サンプル数・欠測・DB サイズ・バッチ）に対する頑健性。同一個人の反復測定、セット内遺伝子の個人間共変動はどちらも評価軸にない</td>
+          </tr>
+          <tr>
+            <td>手法別の推奨（本研究では扱わない）</td>
+            <td><span class="tag caution">占有済み</span></td>
+            <td>18 手法 × 8 評価項目の推奨表（Table 2）が完成している。ここを主軸にすると後追いになるため、手法は 4 種に固定し共変量として扱う</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>先行研究の実像</h2>
+  <p>Toro-Domínguez et al. の設計を、T26 が置きたい軸と対応させて並べる。PubMed から取得した本文（PMC12710473）に基づく。</p>
+  <table>
+    <thead>
+      <tr><th style="width:22%">項目</th><th style="width:39%">先行研究</th><th style="width:39%">T26 の設計</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>疾患・領域</td><td>SLE のみ（5 コホート）</td><td>疾患非依存。健常個人の免疫細胞の摂動応答</td></tr>
+      <tr><td>データ構造</td><td>横断（患者 376 + 健常 263、他 4 コホート統合）</td><td>同一個人の対応あり（安静時 / LPS 2h / LPS 24h / IFN-γ 24h、最大 414 名）</td></tr>
+      <tr><td>細胞種</td><td>全血・PBMC 由来のバルク</td><td>CD14+ 精製単球（細胞組成の交絡が原理的に生じない）</td></tr>
+      <tr><td>遺伝子セット</td><td>SLE-Diseaseome 5,212 セット（単一集合）</td><td>6 ファミリー 4,562 セット + データ由来モジュール（複合体 / 経路 / シグネチャ / regulon / マーカー / データ由来）</td></tr>
+      <tr><td>手法</td><td>18 手法（主変数）</td><td>4 手法（共変量。z 平均 / singscore / PLAGE / 中央値順位）</td></tr>
+      <tr><td>評価軸</td><td>実行時間、スコア類似度、サンプル数・欠測・DB サイズへの頑健性、偽セットへの偽陽性率、バッチ統合、横断 ML 性能、臨床所見との関連</td><td>条件効果、個人間の内部整合性、摂動をまたいだ順位一貫性、（外部コホートで）反復測定信頼性と表現型予測力</td></tr>
+      <tr><td>陰性対照</td><td>ランダム遺伝子で作った偽セット（サイズ 5〜100）</td><td>サイズ + 発現量分位マッチ、およびサイズ + 個人間分散分位マッチの 2 種</td></tr>
+      <tr><td>成果物</td><td>手法選択の推奨表</td><td>遺伝子セット選択の適格性基準</td></tr>
+    </tbody>
+  </table>
+
+  <h3>引用できる gap statement</h3>
+  <p class="quote">"Another consideration when choosing the gene set collection is the accuracy and reliability of gene set annotations. Sources of gene sets can vary from curated and peer-reviewed pathway databases to user provided signatures retrieved from individual p[apers]..."<br>
+  — Toro-Domínguez et al. 2025, Discussion</p>
+  <p>この一文の直後で、彼らは注釈の正確さを「ランダム偽セットに対する偽陽性率」で代理している。実在する遺伝子セットの出自ごとに個人層別化の妥当性が違うかは、明示的に開かれた問いとして残っている。</p>
+
+  <h2>周辺検索の結果</h2>
+  <p>1 論文だけを見て「未踏」と判定するのは危険なので、4 方向から検索した。件数は 2026-08-03 時点。</p>
+  <table>
+    <thead>
+      <tr><th style="width:46%">検索の狙い</th><th style="width:10%" class="num">件数</th><th>最も近い論文と、それが T26 を潰さない理由</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>遺伝子セットスコアの信頼性・妥当性を方法論として扱った論文（PubMed / Europe PMC）</td>
+        <td class="num">10</td>
+        <td>全件が「特定の疾患シグネチャ 1 本の臨床妥当性検証」（結核 3 遺伝子シグネチャ等）。汎用の適格性評価フレームは 1 件もない</td>
+      </tr>
+      <tr>
+        <td>遺伝子セット内の共発現とパスウェイ活性の関係</td>
+        <td class="num">116</td>
+        <td>ヒットはすべて個別の分子生物学。「セット内が共発現していなければスコアは個人の特性を表さない」という方法論的な問い自体が立てられていない</td>
+      </tr>
+      <tr>
+        <td>個人間で共発現構造が違うことを扱った研究</td>
+        <td class="num">21</td>
+        <td>Wang et al. <em>Genome Med</em> 2025 が GTEx 967 名 26 組織で個人別ネットワークを作り、加齢に伴う協調性の喪失を biomarker 化。<strong>T26 の前提（個人間で共変動構造が違う）を支持する引用先</strong>であり、遺伝子セットスコアの適格性は扱っていない</td>
+      </tr>
+      <tr>
+        <td>ex vivo 刺激応答の個人差（単球・全血）</td>
+        <td class="num">2</td>
+        <td>2 件とも 2005 / 2009 の研究（<em>J Immunol</em> 2005 の LPS high/low responder 同定、<em>J Mol Cell Cardiol</em> 2009 の冠動脈疾患患者単球）。いずれも遺伝子単位の応答者分類で、遺伝子セットスコアの妥当性という観点はない</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>反復測定信頼性（ICC・test-retest）を遺伝子セットスコアに適用した方法論研究は、4 方向のいずれからも出てこなかった。これが軸 3 を新規と判断した根拠である。</p>
+
+  <h2>この判定を踏まえた立て位置の修正</h2>
+  <ol>
+    <li><strong>先行研究を敵にしない。</strong>「手法側は既に整理された。残っているのは遺伝子セット側である」と接続する。彼らの Table 2 を引用しつつ、本研究は手法を 4 種に固定して遺伝子セットを動かす、と Methods で明言する。</li>
+    <li><strong>橋渡しの結果を前面に出す。</strong>予備解析で、手法間の順位不一致は内部整合性が低いセットに集中していた（整合性 0.02 未満で最悪手法対の順位相関 −0.060、0.3 以上で 0.812）。これは「手法選択問題の一部は遺伝子セット選択問題である」という主張になり、先行研究と補完関係を作れる。</li>
+    <li><strong>疾患横断の主張はしない。</strong>先行研究は SLE 特化、本研究は健常単球の摂動応答。どちらも単一領域なので、一般性の主張は「同じ枠組みを他領域に適用できる」までに留める。</li>
+    <li><strong>反復測定コホートの確保を Aim 3 の前提条件として明記する。</strong>主コホートに反復測定がないことは既に確認済み（E-MTAB-2232 の無刺激 24h は SDRF に記載があるが処理済み行列に含まれない）。ここを外部データで埋めない限り、4 軸のうち 1 軸は空欄のままになる。</li>
+  </ol>
+
+  <details>
+    <summary>参照文献（DOI 検証済み）</summary>
+    <ul>
+      <li>Toro-Domínguez D, Wang C, Ellson-Lancho I, Martorell-Marugán J, López-Domínguez R, Carmona-Sáez P, Alarcón-Riquelme ME, Baribaud F. Benchmarking single-sample gene set scoring methods for application in precision medicine. <em>Brief Bioinform</em>. 2025;26(6). <a href="https://doi.org/10.1093/bib/bbaf684">DOI: 10.1093/bib/bbaf684</a>（PMID 41405962 / PMC12710473）</li>
+      <li>Wang HT, Xiao FH, Zhao L, Su Q, Xia TR, Yang LQ, Ma SY, Kong QP. Personalized transcriptional network analysis links age-related loss of gene coordination to individual biological aging. <em>Genome Med</em>. 2025;17(1):104. <a href="https://doi.org/10.1186/s13073-025-01533-6">DOI: 10.1186/s13073-025-01533-6</a>（PMID 41013779）</li>
+      <li>Fairfax BP, et al. Innate immune activity conditions the effect of regulatory variants upon monocyte gene expression. <em>Science</em>. 2014;343(6175):1246949. <a href="https://doi.org/10.1126/science.1246949">DOI: 10.1126/science.1246949</a>（主コホート E-MTAB-2232 の出典）</li>
+    </ul>
+    <p class="caption">文献情報は PubMed および Europe PMC から取得した。上記 3 件は DOI・著者・掲載誌を実査で確認済み。周辺検索でヒットした残りの文献は、タイトル・掲載誌・年のみの確認にとどまる（本判定では引用しない）。</p>
+  </details>
+
+  <details>
+    <summary>この判定の弱点</summary>
+    <ul>
+      <li>先行研究の Supplementary Figure（S1–S3）は未確認。本文で触れられていない遺伝子セット比較が補遺にある可能性は残る</li>
+      <li>検索は PubMed / Europe PMC のみ。bioRxiv の未査読プレプリントは未検索で、同じ問いが進行中である可能性がある</li>
+      <li>「件数」は検索クエリ依存で、網羅性の証明ではない。投稿前に系統的検索（PRISMA 準拠）をやり直す必要がある</li>
+    </ul>
+  </details>
+</div>
+
+<footer class="doc">
+  <div class="wrap">
+    <h4>pathway-stratification-validity / docs/01</h4>
+    <p>この文書は個人研究の着手判断のための内部文書である。研究の境界定義は docs/00-研究分離メモ.md を参照。</p>
+    <p>2026-08-03 作成</p>
+  </div>
+</footer>
+</body>
+</html>

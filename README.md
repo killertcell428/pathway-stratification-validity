@@ -1,122 +1,202 @@
-﻿# Can gene set scores measure individual functional traits?
+﻿# pathway-stratification-validity
 
-Analysis code for the preprint *Can gene set scores measure individual functional traits? Separating condition effects from individual-level coherence, and attributing the coherence that remains*.
+遺伝子セットスコアは、個人の機能特性を測れるのか。
 
-Gene set scores were designed for group comparison. They are now computed per patient and used to order individuals by score. That shift requires something group comparison never has to check: that the genes in a set rise and fall together from one individual to the next. This repository contains the code that tests whether they do, in five public transcriptome cohorts.
+**中心命題**: 静的な遺伝子セットスコアは、条件間変化の測定には有効でも、個人の安定した機能特性を表すとは限らない。
 
-**Preprint**: [DOI to be added]
+公開摂動トランスクリプトーム（CD14+ 精製単球、同一個人の安静時と刺激後）を使い、条件効果・個人間整合性・摂動をまたいだ順位一貫性を**分離して**評価し、「個人層別化に使える遺伝子セットの成立条件」を定量化する。
 
----
+> **予備知識なしで読める解説**: [`docs/04-ここまでの成果_やさしい解説.html`](docs/04-ここまでの成果_やさしい解説.html)（高校生物までを前提、用語の対応表つき）
+>
+> 状態: プレプリント投稿準備中。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
 
-## What the analysis measures
+## 予備結果（2,195 遺伝子セット × 207 名の検証個人）
 
-For every gene set, two properties are measured separately in the same individuals:
+| 観察 | 数値 |
+|---|---|
+| 条件効果（安静時 → LPS 24h）が有意なセット | 90.8%（1,992 / 2,195、BH-FDR 0.05） |
+| 個人間整合性がランダム対照を超えるセット | **4.6%**（2種の対照の両方を通過、100）／18.6%（雑音軸を除去してから判定、409） |
+| **条件効果はあるが個人整合性がないセット** | **86.7%**（1,902）／雑音軸除去後は 73.4%（1,612） |
+| 条件効果と個人整合性の両方を満たすセット | 4.1%（90）／雑音軸除去後は 17.3%（380） |
 
-- **Condition effect** — does the score change when the same individual is perturbed?
-- **Individual-level coherence** — do the genes in the set covary across individuals?
+ファミリー別の中央値（内部整合性 = 個人間での遺伝子間平均 Spearman ρ）:
 
-Every metric is evaluated against **random gene sets matched for size and mean expression**. Absolute values are not interpretable on their own: section 3.8 of the paper shows that the level of the controls moves 70-fold with the choice of normalisation alone.
+| 遺伝子セットファミリー | n | サイズ中央値 | 内部整合性 | 合格（2種の対照の両方） | 合格（雑音軸除去後） |
+|---|---|---|---|---|---|
+| データ由来共発現モジュール（本研究で導出） | 61 | 9 | **0.364** | **88.5%** | 96.7% |
+| 細胞種マーカー（PanglaoDB） | 34 | 105 | 0.051 | 32.4% | 88.2% |
+| 反応経路（Reactome） | 1,172 | 20 | 0.032 | 2.0% | 21.6% |
+| 発現シグネチャ（MSigDB Hallmark） | 35 | 125 | 0.024 | 17.1% | 48.6% |
+| タンパク質複合体（CORUM） | 745 | 4 | 0.023 | 0.8% | 5.6% |
+| 転写因子 regulon（TRRUST） | 146 | 8 | 0.008 | 0.0% | 5.5% |
 
-Main result: condition effects are near-universal (88.3–90.8% of sets across two perturbation cohorts) while coherence is distinctly rarer, and whatever coherence appears tracks the largest source of variance in that experiment — measurement chip, blood cell composition, or ischemic time — rather than the biology the set is named for.
+事前の予想（複合体や regulon は上流を共有するので個人間でも共変動しやすい）は**外れた**。ただし外れ方は当初考えたより込み入っている。
 
----
+**合格率はそのまま比べられない。**合格率は効果量ではなく検出力であり、セットが大きいほど通る（3〜5 遺伝子帯 0.7% → 61〜200 遺伝子帯 13.7%）。ファミリーはサイズ帯がほとんど重ならず、CORUM 複合体は 745 件のうち 734 件が 25 遺伝子以下、細胞種マーカーは 34 件すべてが 61〜200 遺伝子である。同一サイズ帯に限って超過分（整合性 − 対照平均）で比べ直すと、外れ方は 3 つに分かれる。
 
-## Data
+1. **対照を下回るのは転写因子 regulon だけ**。6 遺伝子以上のすべての帯で超過分が負（−0.0009 / −0.0076 / −0.0085 / −0.0069）で、検出力では説明できない
+2. **「物理的複合体が最も区別できない」は一般には成立しない。**25 遺伝子以下の 3 帯では複合体が経路を下回るが、26〜60 帯では上回る（+0.0661 対 +0.0167）。RNA-seq マクロファージでは 11 遺伝子以上の全帯で上回る
+3. **26 遺伝子以上の複合体では通るものと通らないものが機能で分かれる。**該当 11 件のうち対照を上回る 4 件は**すべてミトコンドリア系**（呼吸鎖複合体 I +0.149、28S +0.112、55S +0.091、39S +0.074）。スプライソソーム・Mediator・プロテアソームは通らない。単一の専用核コードプログラムで駆動される複合体は共変動し、独立に制御される構成要素の集合体は共変動しない、という仮説が立つ（n = 11、要確認）
 
-No data files are included. All inputs are public accessions, downloaded by `pixi run download`:
+### 見かけの整合性の由来（帰属検証）
 
-| Accession | Content | Source |
+細胞種マーカーで整合性が高いのは Hemangioblasts・Trophoblast Progenitor Cells・Reticulocytes だが、**これはラベルの細胞種が単球に混ざっているという話ではない**。GMT を開くと、これらのセットの遺伝子内容はラベルと対応していない。Hemangioblasts（97 遺伝子）は赤血球・血小板のプログラム（AHSP, ALAS2, HBD, HBG1/2, GATA1, KLF1, ITGA2B, PF4）、Trophoblast Progenitor Cells（103 遺伝子）はミエロイドとインターフェロン（IRF1, IRF7, ISG20, FCGR3B）、Reticulocytes（103 遺伝子）は翻訳と核膜孔で**ヘモグロビン遺伝子を 1 つも含まない**。Spermatozoa（108 遺伝子）は C1QA/B/C・CD14・CD163・CSF1R を含む初代マクロファージのプログラムである。
+
+つまり**整合性はラベルではなく遺伝子内容に対応し、その内容は検体の中に実在する軸（混入細胞、インターフェロントーン、増殖と生合成、細胞の同一性）に帰属する**。"Monocytes" セット自体は対照を超えない（z = 1.58）。遺伝子内容の一覧は原稿の補遺 S3 にある。そこで 5 軸（単球サブセット比率／血小板混入／赤血球混入／リンパ球混入／全遺伝子の第 1 主成分）を各遺伝子から回帰で抜いて再評価した。
+
+- **事前に疑っていた組成の交絡は否定された。** 単球サブセット軸を抜いても整合性は落ちない（0.051 → 0.052）。血小板・赤血球混入も同様
+- **主因は全遺伝子の第 1 主成分。** 抜くと細胞種マーカー −36%、反応経路 −18%、発現シグネチャ −17%。データ由来モジュールは −7% で頑健
+- **その第 1 主成分の正体は測定チップだった。** SDRF の `Assay Name` が Illumina BeadChip のバーコードとチップ内位置を持つことを利用して判定。PC1（全分散の 15.5%）の **0.899 がチップで説明される**（ラベル並べ替えによる偶然水準 0.283、p = 0.005）。チップ内位置と処理バッチは無関係。**各個人が 1 枚のチップにしか乗らないため、チップ効果が個人差として振る舞う**
+- **絶対値は水増しされるが、対照比較は歪まない。** チップを抜くと反応経路 0.032 → 0.021（−35%）だが、対照も 0.016 → 0.005 に下がるため合格は 110（5.0%）→ 470（21.4%）に増える。**絶対値を根拠にすると騙されるが、対照比較を通せば判定は保守側に働く**
+- **中心的な所見はチップの産物ではない。** チップ補正後もファミリーの順序は保たれ、データ由来モジュールの優位（0.302、z = 10.5）と NOX2 の不合格（z = 1.94）は維持される
+- **帰属の問題が残る。** 軸除去後も Trophoblast Progenitor Cells は z = 9.25、Reticulocytes は z = 10.41。整合性の存在は、セットが名乗る生物学の反映を保証しない → 適格性基準に「帰属可能性」の要件と、**集合の遺伝子内容を確認する**手順が必要
+- 限界: チップと個人が完全に交絡しているため（1 個人 = 1 チップ）、0.899 は技術要因の**上限**。分離には同一個人を複数チップで測ったデータが必要
+
+### 技術か生物学か（第 2 検証コホート GSE35846、全血 189 名）
+
+技術（プレート ID 17 枚／チップ内位置／処理日／RIN）と生物学（性別・年齢・体脂肪率・民族）の共変量を**両方持つ**唯一の候補。細胞種マーカーのスコアを細胞組成の代理として加え、PC1–PC5 の分散をどれが説明するかを比べた（ラベル並べ替え 200 回で偶然水準を引く）。
+
+| 分類 | 合計（PC1–5 を分散で重み付け） | 内訳 |
 |---|---|---|
-| E-MTAB-2232 | CD14+ monocytes, resting / LPS / IFN-γ, Illumina HT-12 v4 | ArrayExpress |
-| GSE47353 | PBMC, influenza vaccination timecourse, Affymetrix Gene 1.0 ST | GEO |
-| GSE35846 | Whole blood with technical and biological covariates | GEO |
-| GSE81046 | Primary macrophages, RNA-seq, bacterial infection | GEO |
-| GTEx v8 | Whole blood, RNA-seq | GTEx Portal |
-| CORUM, Reactome, MSigDB Hallmark, TRRUST, PanglaoDB | Gene set libraries | via Enrichr |
+| **細胞組成** | **1.053** | PC1 = リンパ球系（naive T 0.485 / B 0.320 / NK 0.219）、PC2 = ミエロイド系（好中球 0.774 / 血小板 0.689 / 単球 0.688） |
+| 技術 | 0.125 | ほぼ全部がプレート（PC3–PC5 で 0.213 / 0.419 / 0.307）。**RIN・処理日・チップ内位置は寄与しない** |
+| 人口統計 | 0.087 | 民族 0.032 / 体脂肪率 0.027 / 年齢 0.022 / 性別 0.006 |
 
-Retrieval source, date and SHA-256 for every file are recorded in `data/checksums/provenance.jsonl`, which **is** included. That record is the only way a third party can confirm they obtained the same bytes.
+**機序の主張はこう精密化される**: 見かけの個人整合性を支配するのは、その設計で**最大の攪乱要因**である。細胞を精製すれば組成が消えて測定チップが最大になり、混合組織なら細胞組成が最大になる。どちらでも支配的な軸は遺伝子セットが名乗る生物学ではなく、**人口統計学的な生物学の寄与はほぼゼロ**。
 
-GTEx data are used under the terms of the GTEx Portal. The Genotype-Tissue Expression (GTEx) Project was supported by the Common Fund of the Office of the Director of the National Institutes of Health, and by NCI, NHGRI, NHLBI, NIDA, NIMH and NINDS.
+実際、全血で技術要因を抜いても整合性はほとんど動かない（反応経路 0.0373 → 0.0370）。支配的な軸が技術ではなく組成だからで、逆に精製単球ではチップを抜くと反応経路が 0.032 → 0.021（−35%）落ちた。
 
----
+**ファミリーの順序は 3 組織・2 プラットフォームで再現する**（順位の一致 Spearman: 単球 vs PBMC 0.77 / 単球 vs 全血 0.77 / PBMC vs 全血 0.89）。データ由来モジュールと細胞種マーカーが上位、転写因子 regulon が最下位という並びは変わらない。
 
-## Reproducing the analysis
+### 派生する 2 つの知見
 
-The environment is defined by [pixi](https://pixi.sh); `pixi.lock` pins every dependency.
+1. **Cronbach alpha と split-half 信頼性はセットサイズで水増しされる。** 100–200 遺伝子のセットでは、実測 alpha 中央値 0.804 に対しランダム対照の期待値が 0.710。「alpha が高いから個人層別化に使える」とは言えない。サイズ非依存の指標（平均項目間相関）と対照比較が必須になる。
+2. **手法を変えると個人の順位が変わるのは、セットがまとまっていないときに限る。** 内部整合性が 0.02 未満のセットでは、4 手法（z 平均 / singscore / PLAGE / 中央値順位）のうち最も食い違う 2 手法の順位相関が中央値 −0.060。整合性 0.3 以上では 0.812。手法選択の問題は、実は遺伝子セット選択の問題でもある。
+
+### 反復測定信頼性も、ほぼ全部が非特異的な床だった
+
+検証コホート **GSE47353**（PBMC、Affymetrix Gene 1.0 ST）の day-7 と day0 はどちらもワクチン接種前なので、同一個人・同一条件を 7 日間隔で測った対になる（56 名）。
+
+| | |
+|---|---|
+| ICC の中央値 | **0.401**（同サイズ・同発現量のランダムセットは **0.422**） |
+| ICC ≥ 0.5 のセット | 23.0% |
+| **ICC が対照を上回るセット** | **0.8%**（17 / 2,093） |
+| その 17 セットの内訳 | **細胞種マーカー 14**、反応経路 2、データ由来モジュール 1 |
+
+同じ人から採った 2 本の血液は細胞組成と持続的な技術要因を共有するので、**どんな遺伝子の集まりでも ICC 0.4 前後は再現する**。「このシグネチャは ICC 0.5 で安定」という報告は、対照との比較なしには情報を持たない。**7 日間隔で安定して再現する個人特性は血液の細胞組成であり、経路活性ではない。**通過した 17 件はすべて血球組成に対応する。細胞種マーカーとラベルされていない 3 件も、実測すると血球マーカーと強く相関する（WNT 関連の反応経路 2 件は好中球マーカーと −0.726 / −0.657、データ由来モジュールは T 細胞マーカーと +0.853）。WNT 経路 2 件は互いに 8 遺伝子中 7 が共通で、LEF1・TCF7・TCF7L1・TCF7L2・RUNX3 というナイーブ T 細胞の標準マーカーを含む。**WNT シグナルというラベルを着たリンパ球対骨髄系の対比である。**
+
+外部再現性: ファミリーの順序（regulon・複合体が最下位、細胞種マーカーが最上位）は別プラットフォーム・別細胞でも保たれる。ただし混合細胞（PBMC）では全ファミリーの合格率が上がる（細胞種 32.4% → 100%、経路 2.0% → 33.2%）ため、精製細胞で得た閾値をそのまま持ち込めない。データ由来モジュールだけは下がる（88.5% → 48.8%）。
+
+枠組みの陽性対照も機能した。"Monocytes" マーカーセットは精製 CD14+ 単球では対照を超えないが、PBMC では整合性も ICC も対照を超える。
+
+### 表現型予測力: 当初の予測は棄却された
+
+応答クラスが判明している 42 名で、接種前の 2 採血それぞれについてワクチン応答との関連を測った。
+
+| | |
+|---|---|
+| 自分の対照を 2SD 以上上回るセット | day0 で **129**、day-7 で **117** |
+| **両方の採血で上回るセット** | **15**（うち BH-FDR を通るものは 0） |
+| 単一時点で BH-FDR 0.05 を通るセット | day0 で **14**（全部が細胞種マーカー） |
+| 全 2,093 セットの \|rho\| 中央値 | day0 **0.147** / day-7 **0.081** |
+| 同サイズのランダムセット | day0 **0.143** / day-7 **0.092** |
+
+**注釈セットと対照が同じ向きに同じ幅で動いている。** つまり day0 ではランダムな遺伝子の集まりでも応答クラスと \|rho\| = 0.143 で関連し、day-7 では 0.092 に落ちる。**差は採血の性質であって、遺伝子セットの性質ではない。**
+
+当初の予測（適格性の高いセットのほうが表現型を予測する）は棄却された。反復測定信頼性の基準を通った 17 セットは day0 では |rho| 中央値 0.392（残り 0.146、Mann-Whitney p = 4.5e-09）と圧倒的に見えるが、**day-7 では 0.059 に落ち、対照超過 z は 3.19 → −0.34、z > 2 を満たすのは 14/17 → 0/17 になる**。しかもこの 17 は独立ではない（14 が細胞種マーカー、Jaccard 中央値 0.157・最大 0.778、2,186 遺伝子 → 実質 832 = 38.1%）。1 つの所見が 14 回数えられていた。
+
+**単一時点で見れば関連は多重比較補正を通る。**接種直前の採血では 14 セットが BH-FDR 0.05 を通り、全部が細胞種マーカーである（形質細胞様樹状細胞 |rho| = 0.553、巨核球 0.481、好酸球 0.478）。その 14 件を 7 日前に測ると超過は中央値 −0.33 標準偏差で、2 標準偏差を超えるものは 0/14。**関連は検出できる。そして再現しない。**これは「有意な関連が 1 件もない」より強い主張である。
+
+一方、予測の後半「条件効果の大きさは予測力の指標にならない」は成立した（|d| と |rho| の順位相関 0.083）。
+
+**提案する適格性基準は必要条件の集合であって、十分条件ではない。** この否定的結果自体が、個人層別化の主張に独立した再測定を要求すべき根拠になる。
+
+### RNA-seq での再現（WP1、2026-08-05）
+
+**解析コードを 1 行も変えず**、環境変数 `T26_DATASET` による名前空間と設定ファイルの差し替えだけで RNA-seq 2 コホートに適用した。
+
+| 区画 | 精製単球（アレイ・207 名） | マクロファージ（RNA-seq・79 名） |
+|---|---|---|
+| 条件効果あり | 90.8% | 88.3% |
+| 個人整合性あり | 4.6% | 27.4% |
+| **条件効果のみ（層別化不可）** | **86.7%** | **64.4%** |
+
+**乖離の大きさはコホート依存**（培養マクロファージは分化状態の個人差が強い共発現構造を作る）。ただしその構造は雑音軸除去で目減りする（全軸除去で TRRUST regulon −40%、Reactome −27%、Hallmark −18%、**データ由来モジュールは −5%**）。細胞種マーカーだけは +16% と逆に上がる（アレイでは −47%）。
+
+**ファミリー順位のプラットフォーム間比較は、何の順位を取るかで変わる。**6 ファミリーについて、**合格率**の順位は Spearman 0.886（p = 0.019）で一致するが、**超過分**（効果量）の順位は 0.257（p = 0.62）にとどまる。どちらもサイズ帯を混ぜた値なのでサイズに交絡しており、合格率の一致は実質的に「どのファミリーが大きいか」についての一致である。同一サイズ帯に限ると超過分の順位一致は 11〜25 帯で 0.800、26〜60 帯で 1.000 になる。**解釈できるのは帯内の比較である。**共通するのは**データ由来モジュールが最上位**（0.364 と 0.370）である点で、RNA-seq では複合体が第 2 位（アンカーを除く）に上がり細胞種マーカーが最下位に落ちる。サイズ帯を混ぜた順位を適格性の判定に使ってはならない。
+
+**結果 4（帰属）は 4 種類目の攪乱要因まで再現**。GTEx v8 全血（755 検体）で **血球組成 1.510 / 技術 0.594 / 生物学 0.388**（PC1–5 を寄与率で加重、GSE35846 と同一定義）。PC1（29.3%）は好中球 0.787・血小板 0.677・**虚血時間 0.640**・死因分類 0.623 で説明される。生物学 0.388 のうち 0.326 は死因分類で、**年齢＋性別は合計 0.061**。さらに、アフリカ系とヨーロッパ系の免疫応答差を調べるために設計されたコホートでも、**祖先集団は PC1 の 2.0% しか説明しない**（並べ替え検定 p = 0.23）。ラベルと遺伝子内容が対応しない細胞種マーカーが上位に来ること（Reticulocytes 0.326、Pluripotent Stem Cells 0.301、Undefined Placental Cells 0.192、Spermatozoa 0.146）も再現。前述のとおり、これらの内容は翻訳・細胞周期・マクロファージのプログラムであってラベルの細胞種ではない。
+
+**正規化の選択で対照の水準が桁で変わる**ことも判明した。同じ 11,623 遺伝子・同じ 79 名で定量だけ差し替えると、log2(TPM+1) は PC1 が 45.3% を占め各検体の平均発現量と ρ = 0.977（複雑度アーティファクト）、ランダム対照の整合性は 0.168。分位正規化で 0.002、TMM log-CPM（edgeR 標準）で 0.012 まで下がる。**対照の水準が 70 倍動く。**ただし検出率との関連はどの正規化でも消えない（|ρ| = 0.600 / 0.559 / 0.585）。**中心主張「絶対値を根拠にせず対照との差で報告する」の前処理側からの裏づけになる。**
+
+詳細は [`docs/06-WP1結果_RNAseq再現.html`](docs/06-WP1結果_RNAseq再現.html)。
+
+図は [`results/figures/`](results/figures)、全数値は [`results/tables/gene_set_metrics.csv`](results/tables)（反復測定は `retest_metrics.csv`、表現型は `phenotype_metrics.csv`）。
+
+## 再現手順
 
 ```bash
 pixi install
-pixi run test          # validate the metrics on synthetic data (11 tests)
-pixi run download      # fetch public data and gene sets, record SHA-256
-pixi run preprocess    # build gene x individual matrices per condition
-pixi run modules       # derive co-expression modules from discovery donors only
-pixi run validation    # build the timepoint matrices for GSE47353
-pixi run analyze       # gene set x metric table
-pixi run attribution   # decompose where the coherence comes from
-pixi run batch         # test whether PCs are explained by chip, position, batch
-pixi run retest        # test-retest reliability (ICC) and external reproducibility
-pixi run phenotype     # phenotype association and its reproducibility across draws
-pixi run technical     # technical vs biological vs composition in whole blood
-pixi run sensitivity   # coverage filter sensitivity
-pixi run figures       # generate the figures
+pixi run test         # 合成データで指標の妥当性を検証（11 テスト）
+pixi run download     # 公開データと遺伝子セットを取得し sha256 を記録
+pixi run preprocess   # 発見コホートを条件別の gene x individual 行列にする
+pixi run modules      # 探索側の個人からデータ由来モジュールを導出
+pixi run validation   # 検証コホート GSE47353 を時点別の行列にする
+pixi run analyze      # 遺伝子セット x 評価軸のテーブルを作る
+pixi run attribution  # 内部整合性の由来を軸別に特定する
+pixi run batch        # 主成分が測定チップで説明されるかを判定する
+pixi run retest       # 反復測定信頼性(ICC)と外部再現性を測る
+pixi run phenotype    # 表現型予測力とその2時点間の再現性を測る
+pixi run technical    # 全血コホートで技術/生物学/細胞組成の寄与を比べる
+pixi run sensitivity  # 被覆率フィルタの感度分析
+pixi run figures      # 主要図 6 枚を生成
+pixi run concept      # コンセプトペーパー(HTML 1 ファイル)を生成
 ```
 
-`pixi run all` runs the chain end to end.
+`pixi run all` で download から concept まで通す。
 
-RNA-seq cohorts reuse **the same analysis code**. Only the input/output namespace and the configuration file are switched, via the `T26_DATASET` environment variable:
+## データ
 
-```bash
-pixi run wp1-preprocess          # GSE81046
-pixi run wp1-modules
-pixi run wp1-analyze
-pixi run wp1-attribution
-pixi run wp1-ancestry
-pixi run wp1-normalization       # Table 4: effect of quantification and normalisation
-pixi run wp1-filter-sensitivity  # Table 7: sensitivity to the expression filter
-pixi run wp1-gtex-preprocess     # GTEx v8 whole blood
-pixi run wp1-gtex-attribution
+公開データ本体はリポジトリに含めない。取得元・取得日・sha256 は `data/checksums/provenance.jsonl` に記録される。
+
+| データ | 内容 | 役割 |
+|---|---|---|
+| E-MTAB-2232 (Fairfax et al. *Science* 2014) | CD14+ 精製単球、同一個人の naive / LPS 2h / LPS 24h / IFN-γ 24h、最大 414 名 | 主発見コホート |
+| GSE81046 (Nédélec et al. *Cell* 2016) | 初代マクロファージ RNA-seq、165 名 × 非感染/Listeria/Salmonella。アフリカ系・ヨーロッパ系がほぼ半々 | RNA-seq での再現（WP1） |
+| GTEx v8 全血 (GTEx Consortium *Science* 2020) | RNA-seq 755 検体。RIN・虚血時間・バッチ・年齢・性別・死因分類を公開 | 帰属検証の RNA-seq 再現（WP1） |
+| GSE47353 (Tsang et al. *Cell* 2014) | PBMC、接種前後 5 時点、63 名。day-7 と day0 はどちらも接種前 | 検証コホート 1（反復測定・別プラットフォーム・別細胞・表現型） |
+| GSE35846 (Preininger et al. *PLoS Genet* 2013) | 全血 189 名。技術（プレート/位置/処理日/RIN）と生物学（性別/年齢/体脂肪率/民族）の共変量を持つ | 検証コホート 2（技術要因と生物学的個人差の切り分け） |
+| CORUM / Reactome / MSigDB Hallmark / TRRUST / PanglaoDB（Enrichr 経由） | 5 ファミリー計 4,562 セット | 評価対象 |
+
+## 設計上の判断
+
+- **探索と検証を個人単位で分割**（207 / 207）。データ由来モジュールは探索側だけで導出し、評価は全ファミリー共通の検証側で行う。自分で作ったモジュールを自分で評価する循環を避ける
+- **発現フィルタを先にかける**（安静時平均発現の中位数超え、10,754 / 21,509 遺伝子）。未発現遺伝子を残すと「共発現しない」という結論が検出限界の産物になる
+- **陰性対照を 2 種類**用意する。サイズと発現量分位をそろえたランダムセット、およびサイズと個人間分散分位をそろえたランダムセット。後者はデータ由来モジュールが高分散遺伝子で構成されることによる交絡を潰すため
+- **絶対値ではなく対照との差で報告する**。整合性・alpha・ICC はいずれも技術的共変動とサイズで水増しされるため、サイズと発現量をそろえたランダムセットとの比較を全指標に必須とした
+- **合成データテストを先に書く**。「個人の潜在因子を共有する遺伝子群」と「個人間では独立だが摂動で同方向に動く遺伝子群」を作り分け、指標が両者を区別し、かつ条件効果では区別できないことを確認している（`tests/test_metrics.py`）
+
+## 測れていないこと
+
+- **反復測定の床が技術か生物学か**。ICC は測定済み（上記）だが、GSE47353 の公開メタデータにチップ・処理日がないため、床のうちどれだけが細胞組成の持続で、どれだけが同一個人の 2 検体の同時処理による技術的持続かを分離できない
+- **表現型予測力の判定に必要な規模**。n = 42 では |rho| = 0.4 を検出する検定力が約 70%。「予測力がない」ではなく「この規模では判定できない」が正確
+- **免疫系以外の組織**。5 コホートすべてが血液・免疫系。固形組織での再現は未確認（プラットフォームと集団の限界は WP1 で解消済み）
+- **3 遺伝子未満のセット**（1,152 件）。内部整合性が原理的に定義できないため本枠組みでは扱えない。別の指標（ペア相関そのもの）が必要
+- 被覆率フィルタの影響は感度分析済み（0.3〜0.8 で中心主張の振れ幅 4.4 ポイント、緩めるほど乖離が大きくなるので既定値は保守側）
+
+## ディレクトリ
+
+```
+config/      datasets.yml / gene_sets.yml / analysis.yml（解析条件はすべてここ）
+src/         download / preprocessing / scoring / reliability / visualization
+tests/       合成データによる指標の妥当性テスト
+data/        raw（Git 管理外）/ interim / metadata / checksums
+results/     tables / figures
+docs/        コンセプトペーパー・やさしい解説（一部は公開対象外。`.gitignore` 参照）
+manuscript/  投稿原稿（公開対象外。プレプリントは bioRxiv で公開する）
 ```
 
-This matters for the claim: if the code had to be adjusted per cohort, "the result reproduced in another dataset" would mean much less. Differences in results derive from differences in the data alone.
+## ライセンス
 
----
-
-## Layout
-
-```
-src/            analysis code (shared across all cohorts)
-  preprocessing/  matrix construction, TMM, co-expression modules
-  scoring/        z-mean, singscore, PLAGE, median rank
-  reliability/    all metrics, controls, attribution
-  visualization/  figures, manuscript conversion
-tools/          numerical audit of the manuscript, detector report reader
-tests/          validation of the metrics on synthetic data
-config/         all thresholds, seeds and cohort definitions
-results/tables/   every number in the paper, one row per gene set
-results/figures/  the figures, PNG and SVG
-data/checksums/   retrieval provenance for every input file
-```
-
-Random seeds, gene set retrieval dates and sample exclusion criteria are fixed in `config/`, not in the code.
-
----
-
-## Verifying the numbers in the paper
-
-```bash
-pixi run audit
-```
-
-This recomputes every quantitative claim from `results/tables/` and checks that the value appears in the manuscript. It works in that direction on purpose: transcribing the manuscript's numbers into the checking script would make the transcription itself a new source of error. It also holds a list of retired values that must no longer appear anywhere, which catches the case where one section was corrected and another was not.
-
----
-
-## License
-
-Code is released under the MIT License (see `LICENSE`). The public datasets remain under the terms of their respective sources.
-
----
-
-## Citation
-
-If you use this code, please cite the preprint. [Citation to be added]
+コードは MIT（[`LICENSE`](LICENSE)）。公開データおよび遺伝子セットは各提供元のライセンスに従う。

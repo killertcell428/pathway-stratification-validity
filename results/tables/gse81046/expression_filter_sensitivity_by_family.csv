@@ -1,8 +1,8 @@
 family,CPM >= 0.5,CPM >= 1.0（本文）,CPM >= 2.0
 anchor,50.0,50.0,50.0
-celltype,77.8,71.9,74.1
-complex,19.9,18.8,17.2
-data_derived,96.3,88.6,83.9
-pathway,49.9,48.2,46.3
-regulon,21.8,25.0,21.7
-signature,70.0,81.6,74.3
+celltype,66.7,62.5,55.6
+complex,10.9,9.9,8.7
+data_derived,81.5,77.1,71.0
+pathway,39.3,37.4,35.0
+regulon,12.3,12.7,10.6
+signature,67.5,71.1,71.4

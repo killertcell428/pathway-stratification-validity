@@ -25,6 +25,8 @@ from ..download.fetch_gene_sets import parse_gmt
 from ..scoring.methods import METHODS, ScoringContext, score_set
 from .metrics import (
     alpha_from_mean_rho,
+    draw_null_rho,
+    pools_as_rows,
     condition_effect,
     cronbach_alpha,
     direction_concordance,
@@ -148,9 +150,23 @@ def main(argv: list[str] | None = None) -> int:
 
     print("[4/5] セットごとに評価する")
     filt = gs_cfg["filters"]
-    nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
+    ncfg = cfg["metrics"]["negative_control"]
+    nc = ncfg["n_sets_per_size"]
+    # split-half の対照は平均値を出すためだけに使うので少数で足りる。
+    # 内部整合性の対照は経験 p の分解能を決めるので nc（既定 10,000）まで引く。
+    # 両方を nc にすると split-half が 10,000 x 10 回になり、実用時間に収まらない。
+    nc_sh = ncfg.get("n_sets_split_half", 20)
     repeats = cfg["metrics"]["internal_consistency"]["split_half_repeats"]
     gen = rng(2)
+
+    # 発現量分位・分散分位のプールを「遺伝子名」ではなく S の行番号で持ち直す。
+    # 対照 10,000 個を 1 件ずつ Python で回すと終わらないため、
+    # high_resolution_null の行和による O(gn) 計算にまとめて渡す。
+    pool_expr = pools_as_rows(genes_by_decile, ctx_rest.index)
+    pool_var = pools_as_rows(genes_by_var_decile, ctx_rest.index)
+    if np.isnan(ctx_rest.S).any():
+        print("  S に NaN がある。まとめ計算の前提が崩れる")
+        return 1
 
     rows = []
     skipped = defaultdict(int)
@@ -176,22 +192,30 @@ def main(argv: list[str] | None = None) -> int:
         sh, sh_sb = split_half_reliability(S_sub, repeats, gen)
         ic_pert = mean_pairwise_rho(ctx_pert.S[ctx_pert.idx(present)])
 
-        # 陰性対照: 同じサイズ・同じ発現分位から引いたランダムセット
-        null_ic, null_sh = [], []
-        for rs in matched_random_sets(present, decile_of_gene, genes_by_decile, nc, gen):
-            S_null = ctx_rest.S[ctx_rest.idx(rs)]
-            null_ic.append(mean_pairwise_rho(S_null))
-            null_sh.append(split_half_reliability(S_null, 10, gen)[0])
-        null = empirical_null(ic, null_ic)
-        null_sh_mean = float(np.nanmean(null_sh)) if null_sh else np.nan
-
-        null_var_ic = [
-            mean_pairwise_rho(ctx_rest.S[ctx_rest.idx(rs)])
+        # 陰性対照: 同じサイズ・同じ発現分位から引いたランダムセット。
+        # split-half の対照は平均値だけ使うので少数（nc_sh）で足りる。
+        null_sh = [
+            split_half_reliability(ctx_rest.S[ctx_rest.idx(rs)], 10, gen)[0]
             for rs in matched_random_sets(
-                present, var_decile_of_gene, genes_by_var_decile, nc, gen
+                present, decile_of_gene, genes_by_decile, nc_sh, gen
             )
         ]
-        null_var = empirical_null(ic, null_var_ic)
+        null_sh_mean = float(np.nanmean(null_sh)) if null_sh else np.nan
+
+        # 内部整合性の対照は nc 個（既定 10,000）。経験 p の下限を 1/(nc+1) まで
+        # 下げることで、正規近似を使わずに BH-FDR をかけられるようにする。
+        pos_e = [g for g in present if g in decile_of_gene]
+        pos_v = [g for g in present if g in var_decile_of_gene]
+        null = empirical_null(
+            ic,
+            draw_null_rho(ctx_rest.S, pool_expr,
+                          np.array([decile_of_gene[g] for g in pos_e]), nc, gen).tolist(),
+        ) if len(pos_e) >= 2 else empirical_null(ic, [])
+        null_var = empirical_null(
+            ic,
+            draw_null_rho(ctx_rest.S, pool_var,
+                          np.array([var_decile_of_gene[g] for g in pos_v]), nc, gen).tolist(),
+        ) if len(pos_v) >= 2 else empirical_null(ic, [])
 
         # 条件効果（共通基準の z のまま平均する。条件内で再標準化しない）
         z_genes = [g for g in present if g in z_rest.index]
@@ -258,11 +282,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  評価済み {len(df)} sets / 除外 {dict(skipped)}")
 
     print("[5/5] 多重比較補正して書き出す")
+    # 内部整合性の対照比較は経験 p に BH-FDR をかける。対照 10,000 個なら
+    # 経験 p の下限が 1/10001 で、BH の閾値（alpha * 1 / 検定数）より十分下がるため
+    # 正規近似を使う必要がない。正規近似の p（null_p / var_null_p）は
+    # 旧版との比較のために列として残すが、判定には使わない。
     for col, out in (
         ("delta_p", "delta_q"),
         ("direction_p", "direction_q"),
-        ("null_p", "null_q"),
-        ("var_null_p", "var_null_q"),
+        ("null_p_empirical", "null_q"),
+        ("var_null_p_empirical", "var_null_q"),
+        ("null_p", "null_q_normal"),
+        ("var_null_p", "var_null_q_normal"),
     ):
         ok = df[col].notna()
         df[out] = np.nan

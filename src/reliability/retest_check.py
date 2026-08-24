@@ -26,9 +26,10 @@ from statsmodels.stats.multitest import multipletests
 from ..common import INTERIM, TABLES, load_config, rng
 from ..scoring.methods import _rank_rows, _standardize_rows
 from .metrics import (
+    draw_index_matrix,
     empirical_null,
+    null_batch,
     icc_two_way,
-    matched_random_sets,
     mean_pairwise_rho,
     pooled_set_score,
     rank_consistency,
@@ -36,6 +37,9 @@ from .metrics import (
 from .run_evaluation import load_all_sets
 
 RETEST = ("day-7", "day0")
+
+
+NULL_CHUNK = 2_000
 
 
 def main() -> int:
@@ -70,6 +74,14 @@ def main() -> int:
         by_dec[int(d)].append(g)
 
     index = {g: i for i, g in enumerate(genes)}
+    # 抽出プールを遺伝子名ではなく行番号で持つ（まとめ計算に渡すため）
+    pool_by_decile = {
+        int(d): np.array([index[g] for g in gs], dtype=np.int64)
+        for d, gs in by_dec.items()
+    }
+    if np.isnan(z).any() or np.isnan(S_day0).any():
+        print("z または S に NaN がある。まとめ計算の前提が崩れる")
+        return 1
     all_sets = load_all_sets(gs_cfg)
     filt = gs_cfg["filters"]
     nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
@@ -92,23 +104,37 @@ def main() -> int:
         icc = icc_two_way(np.column_stack([s_a, s_b]))
         ic = mean_pairwise_rho(S_day0[idx])
 
-        random_sets = matched_random_sets(present, dec, by_dec, nc, gen)
+        # 対照 nc 個（既定 10,000）。1 件ずつ Python で ICC を呼ぶと終わらないので、
+        # (対照, 個人) の作業配列にまとめて計算する（metrics.null_batch）。
+        # 経験 p の下限を 1/(nc+1) まで下げることで、正規近似を使わずに
+        # BH-FDR をかけられる。ICC の帰無分布は左に歪む（歪度の中位数 -0.22）ため、
+        # 正規近似は右裾で厳しい側に外れていた。
+        pos = [g for g in present if g in dec]
+        dec_pos = np.array([dec[g] for g in pos], dtype=np.int64)
         null_ic, null_icc, null_rho = [], [], []
-        for rs in random_sets:
-            ridx = np.array([index[g] for g in rs], dtype=int)
-            null_ic.append(mean_pairwise_rho(S_day0[ridx]))
-            ra, rb = scores(ridx)
-            null_icc.append(icc_two_way(np.column_stack([ra, rb])))
-            null_rho.append(rank_consistency(ra, rb)["rho"])
-        n_ic = empirical_null(ic, null_ic)
-        n_icc = empirical_null(icc, null_icc)
-        n_rho = empirical_null(rc["rho"], null_rho)
+        filled = 0
+        while filled < nc:
+            take = min(NULL_CHUNK, nc - filled)
+            m = draw_index_matrix(pool_by_decile, dec_pos, take, gen)
+            x, y, r = null_batch(m, z_a, z_b, S_day0)
+            null_ic.append(x)
+            null_icc.append(y)
+            null_rho.append(r)
+            filled += take
+        n_ic = empirical_null(ic, np.concatenate(null_ic).tolist())
+        n_icc = empirical_null(icc, np.concatenate(null_icc).tolist())
+        n_rho = empirical_null(rc["rho"], np.concatenate(null_rho).tolist())
 
         rows.append({
             "set": name, "family": family, "n_genes_present": len(present), "coverage": cov,
-            "ic_day0": ic, "ic_null_mean": n_ic["null_mean"], "ic_z": n_ic["null_z"], "ic_p": n_ic["null_p"],
-            "icc": icc, "icc_null_mean": n_icc["null_mean"], "icc_z": n_icc["null_z"], "icc_p": n_icc["null_p"],
-            "retest_rho": rc["rho"], "retest_rho_null": n_rho["null_mean"], "retest_rho_p": n_rho["null_p"],
+            "ic_day0": ic, "ic_null_mean": n_ic["null_mean"], "ic_z": n_ic["null_z"],
+            "ic_p": n_ic["null_p"], "ic_p_empirical": n_ic["null_p_empirical"],
+            "icc": icc, "icc_null_mean": n_icc["null_mean"], "icc_z": n_icc["null_z"],
+            "icc_p": n_icc["null_p"], "icc_p_empirical": n_icc["null_p_empirical"],
+            "n_control": n_ic["n_control"],
+            "retest_rho": rc["rho"], "retest_rho_null": n_rho["null_mean"],
+            "retest_rho_p": n_rho["null_p"],
+            "retest_rho_p_empirical": n_rho["null_p_empirical"],
             "retest_tertile_swap": rc["tertile_swap"],
         })
 
@@ -116,7 +142,11 @@ def main() -> int:
     if df.empty:
         print("評価できたセットが 0 件")
         return 1
-    for col, out in (("ic_p", "ic_q"), ("icc_p", "icc_q"), ("retest_rho_p", "retest_rho_q")):
+    # BH-FDR は経験 p にかける。正規近似の p は旧版との比較のために列として残す。
+    for col, out in (("ic_p_empirical", "ic_q"), ("icc_p_empirical", "icc_q"),
+                     ("retest_rho_p_empirical", "retest_rho_q"),
+                     ("ic_p", "ic_q_normal"), ("icc_p", "icc_q_normal"),
+                     ("retest_rho_p", "retest_rho_q_normal")):
         ok = df[col].notna()
         df[out] = np.nan
         if ok.sum() > 1:

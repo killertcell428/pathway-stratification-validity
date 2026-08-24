@@ -28,6 +28,7 @@ import pandas as pd
 from ..common import INTERIM, METADATA, RAW, TABLES, load_config, rng
 from ..download.fetch_gene_sets import parse_gmt
 from ..scoring.methods import _rank_rows, _standardize_rows
+from .metrics import null_rho_multi  # noqa: F401
 from .metrics import empirical_null, matched_random_sets, mean_pairwise_rho
 from .run_evaluation import load_all_sets
 
@@ -153,6 +154,12 @@ def main() -> int:
         by_dec[int(d)].append(g)
 
     index = {g: i for i, g in enumerate(sub.index)}
+    pool_by_decile = {
+        int(d): np.array([index[g] for g in gs], dtype=np.int64)
+        for d, gs in by_dec.items()
+    }
+    for cond, mat in S.items():
+        assert not np.isnan(mat).any(), f"S[{cond}] に NaN。まとめ計算の前提が崩れる"
     all_sets = load_all_sets(gs_cfg)
     filt = gs_cfg["filters"]
     nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
@@ -171,25 +178,31 @@ def main() -> int:
             rec[f"ic_{cond}"] = mean_pairwise_rho(mat[idx])
         # 対照は補正条件ごとに取り直す。自由度を落とす補正は対照側の相関も下げるため、
         # 同じ補正を通した対照と比べないと意味がない。
-        random_sets = matched_random_sets(present, dec, by_dec, nc, gen)
+        # 対照 nc 個（既定 10,000）を 1 回引き、3 つの補正条件すべてに当てる。
+        # 条件ごとに引き直すと「補正の差」と「引きの差」が混ざる。
+        dec_pos = np.array([dec[g] for g in present if g in dec], dtype=np.int64)
+        nulls = null_rho_multi(
+            {c: S[c] for c in ("batch_position", "chip", "none")},
+            pool_by_decile, dec_pos, nc, gen,
+        )
         for cond, tag in (("batch_position", "bp"), ("chip", "chip"), ("none", "raw")):
-            nulls = [
-                mean_pairwise_rho(S[cond][np.array([index[g] for g in rs], dtype=int)])
-                for rs in random_sets
-            ]
-            nn = empirical_null(rec[f"ic_{cond}"], nulls)
+            nn = empirical_null(rec[f"ic_{cond}"], nulls[cond].tolist())
             rec[f"null_{tag}_mean"] = nn["null_mean"]
             rec[f"null_{tag}_z"] = nn["null_z"]
             rec[f"null_{tag}_p"] = nn["null_p"]
+            rec[f"null_{tag}_p_empirical"] = nn["null_p_empirical"]
+            rec[f"null_{tag}_skew"] = nn["null_skew"]
         out.append(rec)
 
     df = pd.DataFrame(out)
     from statsmodels.stats.multitest import multipletests
     for tag in ("raw", "bp", "chip"):
-        ok = df[f"null_{tag}_p"].notna()
+        # BH-FDR は経験 p にかける（正規近似は右裾で甘い側に外れる）
+        ok = df[f"null_{tag}_p_empirical"].notna()
         df[f"null_{tag}_q"] = np.nan
         if ok.sum() > 1:
-            df.loc[ok, f"null_{tag}_q"] = multipletests(df.loc[ok, f"null_{tag}_p"], method="fdr_bh")[1]
+            df.loc[ok, f"null_{tag}_q"] = multipletests(
+                df.loc[ok, f"null_{tag}_p_empirical"], method="fdr_bh")[1]
     df.to_csv(TABLES / "batch_check_sets.csv", index=False, encoding="utf-8")
 
     cols = [c for c in df.columns if c.startswith("ic_")] + [

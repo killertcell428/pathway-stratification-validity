@@ -19,6 +19,9 @@ matplotlib = "*"
 pyyaml = "*"
 requests = "*"
 pytest = "*"
+# 先行研究の補足データ（Scheid et al. 2018 の Table S2）が xlsx で配布されているため、
+# 反復測定信頼性を第 2 コホートで再現する検討に必要。pandas.read_excel の依存。
+openpyxl = "*"
 
 [pypi-dependencies]
 # 査読用の Word 原稿を生成する（原稿の原本は manuscript/*.md、docx はそこから作る）
@@ -26,6 +29,13 @@ python-docx = "*"
 # AI 検出器（GPTZero 等）が返す PDF から、ハイライト注釈の色と対象テキストを取り出す。
 # 投稿前に検出器を再実行するため、使い捨てにせずここに置く。
 pymupdf = "*"
+# Venet ら (2011) の補足データは R バイナリ (.Rda)。R 本体は再解析用で重いので、
+# 読み取りだけを行うこの軽量ライブラリを使う。
+pyreadr = "*"
+# .Rda の中身が R のリスト型で pyreadr では読めなかったため、
+# より広い型を扱える純 Python の RData パーサを併用する。
+rdata = "*"
+gseapy = ">=1.3.1, <2"
 
 [tasks]
 check = "python -c \"import pandas, numpy, scipy, statsmodels, sklearn, pyarrow; print('imports OK')\""
@@ -44,6 +54,14 @@ figures = { cmd = "python -m src.visualization.figures", description = "主要�
 concept = { cmd = "python -m src.visualization.build_concept_paper", description = "共同研究相談用のコンセプトペーパー(HTML 1 ファイル)を生成する" }
 docx = { cmd = "python -m src.visualization.build_docx", description = "manuscript/*.md を査読用の Word (.docx) に変換する" }
 audit = { cmd = "python -m tools.audit_numbers", description = "原稿の数値を解析出力の CSV と機械照合する（投稿前に必ず通す）" }
+detector-coverage = { cmd = "python -m tools.detector_coverage", description = "AI 検出器レポートが原稿のどこまでを見たか、節ごとの指摘密度を集計する" }
+# --- WP2: 事前登録を書く前の成立性検査（説明変数は計算しない。docs/08 参照）---
+wp2-power = { cmd = "python -m tools.wp2_power", description = "群サイズ別の検出力を数値実験で求める" }
+wp2-tcga-feasibility = { cmd = "python -m tools.wp2_tcga_feasibility", description = "TCGA-BRCA の検体絞り込み・十分位の健全性・被覆率を確認する（#1-#3）" }
+wp2-tcga-outcome = { cmd = "python -m tools.wp2_tcga_outcome", description = "TCGA の生存データで目的変数が作れるかを確認する（#4-#5）" }
+wp2-tcga-grid = { cmd = "python -m tools.wp2_tcga_endpoint_grid", description = "終点 4 種 x コホート 5 種で meta-PCNA の予後関連を全数評価する" }
+wp2-venet-outcome = { cmd = "python -m tools.wp2_venet_outcome", description = "Loi / NKI で Venet の所見を再現し、目的変数の再現性を測る" }
+wp2-audit = { cmd = "python -m tools.audit_wp2_prereg", description = "WP2 事前登録の数値を検査出力の CSV と機械照合する（登録前に必ず通す）" }
 test = "pytest -q tests"
 # --- WP1: RNA-seq 再現（T26_DATASET 名前空間で同じ解析コードを再実行する）---
 wp1-preprocess = { cmd = "python -m src.preprocessing.build_rnaseq_matrix", env = { T26_DATASET = "gse81046" }, description = "GSE81046 RAW.tar を条件別の gene x individual 行列にする" }
@@ -55,4 +73,26 @@ wp1-normalization = { cmd = "python -m src.reliability.normalization_comparison"
 wp1-filter-sensitivity = { cmd = "python -m src.reliability.expression_filter_sensitivity", env = { T26_DATASET = "gse81046" }, description = "発現フィルタ閾値 CPM 0.5/1/2 で結論が変わらないかを確認する（表 7）" }
 wp1-gtex-preprocess = { cmd = "python -m src.preprocessing.build_gtex_matrix", env = { T26_DATASET = "gtex_blood" }, description = "GTEx v8 全血を TMM log-CPM 行列にする" }
 wp1-gtex-attribution = { cmd = "python -m src.reliability.gtex_attribution", env = { T26_DATASET = "gtex_blood" }, description = "GTEx で主成分の説明要因（技術/生物学/血球組成）を分解する" }
+wp1-gtex-uncertainty = { cmd = "python -m src.reliability.attribution_uncertainty --cohort gtex", description = "GTEx 全血の帰属推定値に部分抽出による 95% 信頼区間を付ける" }
+wp1-tech-uncertainty = { cmd = "python -m src.reliability.attribution_uncertainty --cohort gse35846", description = "GSE35846 全血の帰属推定値に部分抽出による 95% 信頼区間を付ける" }
+subsampling-coverage = { cmd = "python -m src.reliability.subsampling_coverage", description = "部分抽出区間が名目 95% の被覆率を持つかを実データで確かめる" }
+# --- P1-C: 固形組織への一般化（GTEx 骨格筋。組織は T26_GTEX_TISSUE で切替）---
+wp1-muscle-preprocess = { cmd = "python -m src.preprocessing.build_gtex_matrix", env = { T26_DATASET = "gtex_muscle", T26_GTEX_TISSUE = "Muscle - Skeletal" }, description = "GTEx v8 骨格筋を TMM log-CPM 行列にする" }
+wp1-muscle-attribution = { cmd = "python -m src.reliability.gtex_attribution", env = { T26_DATASET = "gtex_muscle", T26_GTEX_TISSUE = "Muscle - Skeletal" }, description = "GTEx 骨格筋で主成分の説明要因を分解する（固形組織での帰属再現）" }
+stability-selected = { cmd = "python -m src.reliability.stability_selected_check", description = "Scheid ら [12] の選抜群が対照を超えるか、組成除去の前後で確かめる（3.9 節）" }
+systematic-search = { cmd = "python -m tools.systematic_search", description = "不在の主張を裏づける系統的検索（PubMed / Europe PMC、プレプリント含む）" }
+screen-search = { cmd = "python -m tools.screen_search", description = "系統的検索の結果を 2 段階でふるい、PRISMA の段階別件数を出す" }
+ssgsea-agreement = { cmd = "python -m src.reliability.ssgsea_agreement", description = "実物の ssGSEA を手法間一致度に加える（3.5 節の穴を塞ぐ）" }
+consistency-definition = { cmd = "python -m src.reliability.consistency_definition", description = "内部整合性を Pearson 版でも取り、結論が保つかを確かめる（3.11 節）" }
+attenuation = { cmd = "python -m src.reliability.attenuation_correction", description = "遺伝子レベル信頼性で減衰補正を当て、判定が動くかを測る（4.3 節）" }
+summarize-sensitivity = { cmd = "python tools/summarize_sensitivity.py", description = "発現フィルタ分位と正規化の腕を集計して表 7b/7c を作る（腕の再走行後に必ず回す）" }
+passing-overlap = { cmd = "python -m src.reliability.passing_set_overlap", description = "反復測定の基準を通ったセットの内訳と非独立性（Jaccard・実質遺伝子数）を数える（3.10 節）" }
+size-stratified = { cmd = "python -m src.reliability.size_stratified", description = "合格率がセットサイズに規定されていないかを層別で確かめる（3.2 節）" }
+dimensionality = { cmd = "python -m src.reliability.dimensionality_check", description = "遺伝子セットを反映型の尺度として解釈できるかを一次元性と手法依存性で測る" }
+control-count = { cmd = "python -m src.reliability.control_count_sensitivity", description = "対照セット数 20/100/500 で合格判定が動くかを層化抽出した部分集合で測る（感度分析）" }
+dependency-fdr = { cmd = "python -m src.reliability.dependency_fdr", description = "BH の独立性仮定を外し Benjamini-Yekutieli で判定し直す（3.11 節）" }
+qc-tables = { cmd = "python -m tools.qc_tables", description = "表と図の数値に解析出力の裏付けがあるかを逆向きに検査する（投稿前に audit と一緒に通す）" }
+prepub-scan = { cmd = "python -m tools.prepublication_scan", description = "公開履歴に入れてはいけないものが混ざっていないかを調べる（public 化と push の前に必ず通す）" }
+variance-decomposition = { cmd = "python -m src.reliability.variance_decomposition", description = "主成分の説明分散を要因群の固有分と共有分に分ける（commonality / Shapley、4 コホート）" }
+review-r2 = { cmd = "python tools/_review/build_r2.py", description = "変更点レビュー資料（2026-08-19 第2版）を HTML と Markdown で再生成する" }
 all = { depends-on = ["download", "preprocess", "modules", "validation", "analyze", "attribution", "batch", "retest", "phenotype", "technical", "figures", "concept"] }

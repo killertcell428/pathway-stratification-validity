@@ -34,6 +34,7 @@ from ..common import INTERIM, METADATA, RAW, TABLES, load_config, rng
 from ..download.fetch_gene_sets import parse_gmt
 from ..scoring.methods import _rank_rows, _standardize_rows
 from .batch_check import dummies, r2_with_permutation, residualize
+from .metrics import null_rho_multi  # noqa: F401
 from .metrics import empirical_null, matched_random_sets, mean_pairwise_rho
 from .run_evaluation import load_all_sets
 
@@ -189,6 +190,12 @@ def main() -> int:
 
     filt = gs_cfg["filters"]
     nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
+    pool_by_decile = {
+        int(d): np.array([index[g] for g in gs if g in index], dtype=np.int64)
+        for d, gs in by_dec.items()
+    }
+    for cond, mat in S.items():
+        assert not np.isnan(mat).any(), f"S[{cond}] に NaN。まとめ計算の前提が崩れる"
     out = []
     for name, (family, gene_list) in all_sets.items():
         present = [g for g in gene_list if g in index]
@@ -199,12 +206,12 @@ def main() -> int:
             continue
         idx = np.array([index[g] for g in present], dtype=int)
         rec = {"set": name, "family": family, "n_genes_present": len(present)}
-        random_sets = matched_random_sets(present, dec, by_dec, nc, gen)
+        # 対照 nc 個（既定 10,000）を 1 回引き、全条件に当てる。
+        dec_pos = np.array([dec[g] for g in present if g in dec], dtype=np.int64)
+        nulls = null_rho_multi(S, pool_by_decile, dec_pos, nc, gen)
         for cond, mat in S.items():
             rec[f"ic_{cond}"] = mean_pairwise_rho(mat[idx])
-            nulls = [mean_pairwise_rho(mat[np.array([index[g] for g in rs], dtype=int)])
-                     for rs in random_sets]
-            nn = empirical_null(rec[f"ic_{cond}"], nulls)
+            nn = empirical_null(rec[f"ic_{cond}"], nulls[cond].tolist())
             rec[f"null_{cond}"] = nn["null_mean"]
             rec[f"z_{cond}"] = nn["null_z"]
         out.append(rec)

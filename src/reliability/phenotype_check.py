@@ -27,6 +27,7 @@ from statsmodels.stats.multitest import multipletests
 
 from ..common import INTERIM, METADATA, TABLES, load_config, rng
 from ..scoring.methods import _standardize_rows
+from .metrics import null_abs_rho_with_target  # noqa: F401
 from .metrics import empirical_null, matched_random_sets
 from .run_evaluation import load_all_sets
 
@@ -80,6 +81,12 @@ def main() -> int:
     all_sets = load_all_sets(gs_cfg)
     filt = gs_cfg["filters"]
     nc = cfg["metrics"]["negative_control"]["n_sets_per_size"]
+    pool_by_decile = {
+        int(d): np.array([index[g] for g in gs if g in index], dtype=np.int64)
+        for d, gs in by_dec.items()
+    }
+    for tp, mat in Z.items():
+        assert not np.isnan(mat).any(), f"Z[{tp}] に NaN。まとめ計算の前提が崩れる"
 
     def assoc(idx: np.ndarray, tp: str, target: np.ndarray) -> tuple[float, float]:
         s = np.nanmean(Z[tp][idx], axis=0)
@@ -102,26 +109,33 @@ def main() -> int:
         rho7, p7 = assoc(idx, "day-7", y)
         rho0_adj, p0_adj = assoc(idx, PRIMARY, y_adj)
 
-        # 対照は 2 時点それぞれで取る。どちらの測定回でも同じ床なのかを見るため
-        nulls, nulls7 = [], []
-        for rs in matched_random_sets(present, dec, by_dec, nc, gen):
-            ridx = np.array([index[g] for g in rs], dtype=int)
-            nulls.append(abs(assoc(ridx, PRIMARY, y)[0]))
-            nulls7.append(abs(assoc(ridx, "day-7", y)[0]))
-        nn = empirical_null(abs(rho0), nulls)
-        nn7 = empirical_null(abs(rho7), nulls7)
+        # 対照 nc 個（既定 10,000）を 1 回引き、2 時点の両方に当てる。
+        # 時点ごとに引き直すと「どちらの測定回でも同じ床か」の比較が崩れる。
+        dec_pos = np.array([dec[g] for g in present if g in dec], dtype=np.int64)
+        nulls = null_abs_rho_with_target(
+            {"day0": Z[PRIMARY], "day-7": Z["day-7"]}, y,
+            pool_by_decile, dec_pos, nc, gen,
+        )
+        nn = empirical_null(abs(rho0), nulls["day0"].tolist())
+        nn7 = empirical_null(abs(rho7), nulls["day-7"].tolist())
 
         rows.append({
             "set": name, "family": family, "n_genes_present": len(present),
             "rho_day0": rho0, "p_day0": p0,
             "rho_day-7": rho7, "p_day-7": p7,
             "rho_day0_adj": rho0_adj, "p_day0_adj": p0_adj,
-            "abs_rho_null_mean": nn["null_mean"], "abs_rho_z": nn["null_z"], "abs_rho_p": nn["null_p"],
+            "abs_rho_null_mean": nn["null_mean"], "abs_rho_z": nn["null_z"],
+            "abs_rho_p": nn["null_p"], "abs_rho_p_empirical": nn["null_p_empirical"],
+            "abs_rho_null_skew": nn["null_skew"],
             "abs_rho_null_mean_day-7": nn7["null_mean"], "abs_rho_z_day-7": nn7["null_z"],
+            "abs_rho_p_empirical_day-7": nn7["null_p_empirical"],
         })
 
     df = pd.DataFrame(rows)
-    for col, out in (("p_day0", "q_day0"), ("abs_rho_p", "abs_rho_q")):
+    # 対照との比較（abs_rho）は経験 p に BH-FDR をかける。p_day0 は
+    # 相関そのものの検定で対照とは無関係なので、そのまま Spearman の p を使う。
+    for col, out in (("p_day0", "q_day0"), ("abs_rho_p_empirical", "abs_rho_q"),
+                    ("abs_rho_p_empirical_day-7", "abs_rho_q_day-7")):
         ok = df[col].notna()
         df[out] = np.nan
         if ok.sum() > 1:

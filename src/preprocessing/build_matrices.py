@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import os
+
 import json
 import sys
 import zipfile
@@ -24,7 +26,7 @@ import zipfile
 import numpy as np
 import pandas as pd
 
-from ..common import INTERIM, METADATA, RAW, load_config, rng
+from ..common import expr_path, gene_mean_path, INTERIM, METADATA, RAW, load_config, rng
 
 # 処理済み zip 内のファイル名の接頭辞 -> 条件キー
 PREFIX_TO_CONDITION = {"CD14": "naive", "LPS2": "lps2", "LPS24": "lps24", "IFN": "ifn24"}
@@ -114,10 +116,13 @@ def apply_expression_filter(
     spec = cfg["preprocessing"]["expression_filter"]
     if spec["method"] != "percentile":
         raise ValueError(f"未実装の発現フィルタ: {spec['method']}")
-    cutoff = float(np.percentile(gene_mean_rest.values, spec["value"]))
+    # 感度分析用に環境変数で分位を上書きできる。既定は設定ファイルの値。
+    # T26_DATASET / T26_MATRIX_SUFFIX と同じ名前空間の考え方に揃えてある。
+    value = float(os.environ.get("T26_EXPR_PERCENTILE", spec["value"]))
+    cutoff = float(np.percentile(gene_mean_rest.values, value))
     expressed = gene_mean_rest.index[gene_mean_rest.values > cutoff]
     print(
-        f"  発現フィルタ: 安静時平均 > {cutoff:.3f} (第{spec['value']}分位) で "
+        f"  発現フィルタ: 安静時平均 > {cutoff:.3f} (第{value:g}分位) で "
         f"{len(expressed)}/{len(gene_mean_rest)} 遺伝子を残す"
     )
     return ({c: m.loc[m.index.intersection(expressed)] for c, m in gene_mats.items()},
@@ -144,12 +149,15 @@ def main() -> int:
     print("[4/4] 書き出す")
     meta = {}
     for cond, mat in gene_mats.items():
-        path = INTERIM / f"expr_{cond}.parquet"
+        # expr_path は T26_MATRIX_SUFFIX を見る。直書きすると、感度分析の走行が
+        # 正本の行列を上書きする（RNA-seq 側の build_rnaseq_matrix は接尾辞対応済みで、
+        # ここだけ非対称になっていた）。
+        path = expr_path(cond)
         mat.astype(np.float32).to_parquet(path)
         meta[cond] = {"n_genes": int(mat.shape[0]), "n_individuals": int(mat.shape[1])}
         print(f"  {path.name}: {mat.shape[0]} genes x {mat.shape[1]} individuals")
 
-    gene_mean.to_csv(INTERIM / "gene_expression_naive.csv")
+    gene_mean.to_csv(gene_mean_path())
 
     ids = {c: set(m.columns) for c, m in gene_mats.items()}
     meta["overlap_with_resting"] = {

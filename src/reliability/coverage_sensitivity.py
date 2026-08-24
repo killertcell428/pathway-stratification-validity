@@ -37,12 +37,31 @@ def summarize(df: pd.DataFrame) -> dict:
     return out
 
 
+def label_for(stem: str) -> str | None:
+    """gene_set_metrics のファイル名から被覆率の水準ラベルを決める。None なら対象外。
+
+    以前は gene_set_metrics*.csv を全部拾い、`_cov` に一致しないものはすべて
+    「0.6 (既定)」にしていた。そのため発現フィルタ分位の腕（_p40 / _p60）も
+    既定ラベルになり、辞書代入で最後に読まれた _p60 が正本の行を上書きしていた
+    （実測: 既定行が 2,195 セットではなく p60 の 1,713 セットになっていた）。
+    正本は接尾辞なしの 1 件だけなので、名前で厳密に判定する。
+    """
+    m = re.search(r"_cov([0-9.]+)$", stem)
+    if m:
+        return f"{float(m.group(1)):.1f}"
+    if stem == "gene_set_metrics":
+        return "0.6 (既定)"
+    return None
+
+
 def main() -> int:
     rows = {}
     for path in sorted(TABLES.glob("gene_set_metrics*.csv")):
-        m = re.search(r"_cov([0-9.]+)", path.stem)
-        label = f"{float(m.group(1)):.1f}" if m else "0.6 (既定)"
+        label = label_for(path.stem)
+        if label is None:
+            continue
         rows[label] = summarize(pd.read_csv(path))
+    assert "0.6 (既定)" in rows, "正本の gene_set_metrics.csv が読めていない"
 
     df = pd.DataFrame(rows).T.sort_index()
     df.to_csv(TABLES / "coverage_sensitivity.csv", encoding="utf-8")

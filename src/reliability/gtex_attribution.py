@@ -84,7 +84,9 @@ def main() -> int:
         if c in cov.columns and cov[c].notna().sum() > len(cov) * 0.5:
             factors[c] = ("生物学", discretize(cov[c]))
     for k, v in comp.items():
-        factors[f"組成:{k}"] = ("血球組成", discretize(pd.Series(v)))
+        # ラベルは組織依存なので設定から取る。骨格筋で「血球組成」と出ると誤りになる。
+        factors[f"組成:{k}"] = (att.get("composition_label", "血球組成"),
+                              discretize(pd.Series(v)))
 
     rows = []
     nperm = int(att["n_permutations"])

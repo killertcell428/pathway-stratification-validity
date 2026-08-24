@@ -32,6 +32,206 @@ def mean_pairwise_rho(S_sub: np.ndarray) -> float:
     return float((c.sum() - np.trace(c)) / (g * (g - 1)))
 
 
+def mean_pairwise_rho_fast(S: np.ndarray, idx: np.ndarray) -> float:
+    """S の idx 行に対する平均ペア Spearman 相関を O(gn) で出す。
+
+    S は行ごとに順位を取って標準化した行列なので、各行の分散は ddof=0 で厳密に 1 に
+    なる。したがって c = S S^T / n の対角は 1 であり、
+        平均ペア相関 = (c.sum() - g) / (g(g-1)) = (||sum_i S_i||^2 / n - g) / (g(g-1))
+    が成り立つ。O(g^2 n) の行列積が O(gn) の行和になる。対照を 20 個から 10,000 個に
+    増やすためにこの式が必要で、同値性は tests/test_high_resolution_null.py で検査する。
+
+    この式が使えるのは S に NaN がない場合だけである（順位は必ず分散を持つので
+    実際には NaN が出ない）。呼び出し側で検査すること。
+    """
+    g = idx.size
+    if g < 2:
+        return np.nan
+    acc = S[idx].sum(axis=0)
+    return (float(acc @ acc) / S.shape[1] - g) / (g * (g - 1))
+
+
+def draw_null_rho(
+    S: np.ndarray,
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+    chunk: int = 2_000,
+) -> np.ndarray:
+    """分位をそろえたランダムセットの平均ペア相関を n_draw 個まとめて作る。
+
+    matched_random_sets と同じ抽出（遺伝子の位置ごとに同じ分位のプールから復元抽出）を
+    行番号で行い、(かたまり, 個人) の作業配列に位置ごとの行を足し込む。
+    行列を実体化しないのでメモリは chunk x 個人数で決まる。
+    """
+    g = decile_of_position.size
+    n = S.shape[1]
+    out = np.empty(n_draw, dtype=np.float64)
+    filled = 0
+    while filled < n_draw:
+        b = min(chunk, n_draw - filled)
+        acc = np.zeros((b, n), dtype=np.float64)
+        for j in range(g):
+            pool = pool_by_decile[int(decile_of_position[j])]
+            acc += S[pool[generator.integers(pool.size, size=b)]]
+        out[filled : filled + b] = (
+            np.einsum("bn,bn->b", acc, acc) / n - g
+        ) / (g * (g - 1))
+        filled += b
+    return out
+
+
+def pools_as_rows(
+    genes_by_decile: dict[int, list[str]], gene_index: dict[str, int]
+) -> dict[int, np.ndarray]:
+    """分位ごとの抽出プールを、遺伝子名ではなく行列の行番号で持ち直す。"""
+    return {
+        int(d): np.array([gene_index[g] for g in gs if g in gene_index], dtype=np.int64)
+        for d, gs in genes_by_decile.items()
+    }
+
+
+def draw_index_matrix(
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+) -> np.ndarray:
+    """(対照数, 遺伝子位置) の行番号行列。位置ごとに同じ分位のプールから復元抽出する。
+
+    既存の matched_random_sets と同じ抽出（位置ごと・復元あり）を、遺伝子名ではなく
+    行番号で行う。位置の順に乱数を消費するので、抽出の流れも元実装と同じ順序になる。
+    """
+    out = np.empty((n_draw, decile_of_position.size), dtype=np.int64)
+    for j in range(decile_of_position.size):
+        pool = pool_by_decile[int(decile_of_position[j])]
+        out[:, j] = pool[generator.integers(pool.size, size=n_draw)]
+    return out
+
+
+def null_rho_multi(
+    mats: dict[str, np.ndarray],
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+    chunk: int = 2_000,
+) -> dict[str, np.ndarray]:
+    """同一の対照セット群を複数の行列で評価する。
+
+    batch_check は「技術要因を抜く前後」を同じ対照セットで比べる。自由度を落とす補正は
+    対照側の相関も下げるので、条件ごとに対照を引き直すと比較の意味が変わる。
+    そのため対照の行番号行列を 1 回引き、それを各行列に当てる。
+    consistency_definition の Spearman/Pearson 比較も同じ理由でここを通す。
+
+    どの行列も行ごとに標準化されている（分散が厳密に 1）ことを前提にする。
+    """
+    acc: dict[str, list[np.ndarray]] = {k: [] for k in mats}
+    filled = 0
+    while filled < n_draw:
+        take = min(chunk, n_draw - filled)
+        idx = draw_index_matrix(pool_by_decile, decile_of_position, take, generator)
+        for k, m in mats.items():
+            acc[k].append(mean_pairwise_rho_batch(m, idx))
+        filled += take
+    return {k: np.concatenate(v) for k, v in acc.items()}
+
+
+def null_abs_rho_with_target(
+    mats: dict[str, np.ndarray],
+    target: np.ndarray,
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+    chunk: int = 2_000,
+) -> dict[str, np.ndarray]:
+    """対照セットのスコアと外部変数の |Spearman| をまとめて作る。
+
+    phenotype_check が「表現型との相関がランダムセットの床を超えるか」を測るのに使う。
+    2 時点を同じ対照セット群で評価するため、行番号行列は 1 回だけ引く
+    （時点ごとに引き直すと「どちらの測定回でも同じ床か」の比較が崩れる）。
+    """
+    assert not np.isnan(target).any(), "target に NaN がある"
+    acc: dict[str, list[np.ndarray]] = {k: [] for k in mats}
+    filled = 0
+    while filled < n_draw:
+        take = min(chunk, n_draw - filled)
+        idx = draw_index_matrix(pool_by_decile, decile_of_position, take, generator)
+        g = idx.shape[1]
+        for k, Z in mats.items():
+            s = np.zeros((take, Z.shape[1]), dtype=np.float64)
+            for j in range(g):
+                s += Z[idx[:, j]]
+            s /= g
+            acc[k].append(
+                np.abs(spearman_batch(s, np.broadcast_to(target, s.shape)))
+            )
+        filled += take
+    return {k: np.concatenate(v) for k, v in acc.items()}
+
+
+def icc_two_way_batch(y: np.ndarray) -> np.ndarray:
+    """ICC(2,1) を (対照, 個人, 測定回) の配列に対してまとめて計算する。
+
+    metrics.icc_two_way と同じ式。NaN がないことを前提にする（呼び出し側で検査）。
+    """
+    b, n, k = y.shape
+    grand = y.mean(axis=(1, 2), keepdims=True)
+    ss_rows = k * ((y.mean(axis=2, keepdims=True) - grand) ** 2).sum(axis=(1, 2))
+    ss_cols = n * ((y.mean(axis=1, keepdims=True) - grand) ** 2).sum(axis=(1, 2))
+    ss_total = ((y - grand) ** 2).sum(axis=(1, 2))
+    ss_err = ss_total - ss_rows - ss_cols
+    ms_rows = ss_rows / (n - 1)
+    ms_cols = ss_cols / (k - 1)
+    ms_err = ss_err / ((n - 1) * (k - 1))
+    denom = ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = (ms_rows - ms_err) / denom
+    return np.where(denom == 0, np.nan, out)
+
+
+def spearman_batch(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """行ごとの Spearman 相関。順位に直してから Pearson を取る。"""
+    ra = stats.rankdata(a, axis=1)
+    rb = stats.rankdata(b, axis=1)
+    ra = ra - ra.mean(axis=1, keepdims=True)
+    rb = rb - rb.mean(axis=1, keepdims=True)
+    num = (ra * rb).sum(axis=1)
+    den = np.sqrt((ra**2).sum(axis=1) * (rb**2).sum(axis=1))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den == 0, np.nan, num / den)
+
+
+def mean_pairwise_rho_batch(S: np.ndarray, idx: np.ndarray) -> np.ndarray:
+    """(対照, 位置) の行番号行列に対する平均ペア Spearman 相関（行和による O(gn) 版）。"""
+    b, g = idx.shape
+    n = S.shape[1]
+    acc = np.zeros((b, n), dtype=np.float64)
+    for j in range(g):
+        acc += S[idx[:, j]]
+    return (np.einsum("bn,bn->b", acc, acc) / n - g) / (g * (g - 1))
+
+
+def null_batch(
+    idx: np.ndarray, z_a: np.ndarray, z_b: np.ndarray, S: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """対照行番号行列に対する (平均ペア相関, ICC, 反復間 Spearman)。"""
+    b, g = idx.shape
+    acc_a = np.zeros((b, z_a.shape[1]), dtype=np.float64)
+    acc_b = np.zeros((b, z_b.shape[1]), dtype=np.float64)
+    for j in range(g):
+        acc_a += z_a[idx[:, j]]
+        acc_b += z_b[idx[:, j]]
+    acc_a /= g
+    acc_b /= g
+    icc = icc_two_way_batch(np.stack([acc_a, acc_b], axis=2))
+    rho = spearman_batch(acc_a, acc_b)
+    ic = mean_pairwise_rho_batch(S, idx)
+    return ic, icc, rho
+
+
 def cronbach_alpha(S_sub: np.ndarray) -> float:
     """標準化済み行列に対する Cronbach の alpha。
 
@@ -189,14 +389,22 @@ def matched_random_sets(
 def empirical_null(observed: float, null_values: list[float]) -> dict[str, float]:
     """観測値を対照分布と比べる。
 
-    empirical p は対照セット数 B に対して 1/(B+1) より小さくならないため、
-    数千セットに FDR をかけると全滅する。そこで正規近似の p も併記し、
-    多重比較補正にはそちらを使う（B は分散推定にだけ使う）。
+    empirical p は対照セット数 B に対して 1/(B+1) より小さくならない。
+    B=20 では下限が 0.048 で、数千セットに BH-FDR をかけると全滅するため、
+    旧版は正規近似の p を作って多重比較補正に使っていた。しかし平均ペア Spearman の
+    帰無分布は有界で右に歪み（歪度の中位数 0.99）、ICC の帰無分布は左に歪む
+    （同 -0.22）。正規近似で裾の確率を出す根拠は弱く、方向も指標によって違う。
+
+    そこで B を 10,000 に増やし、**判定には null_p_empirical を使う**。
+    下限が 1/10001 になり、BH の最小閾値（alpha / 検定数）より十分下がる。
+    null_p（正規近似）は旧版との比較のために返すが、判定には使わない。
+    null_skew は正規近似がどれだけ外れるかの診断値として残す。
     """
     vals = np.array([v for v in null_values if not np.isnan(v)], dtype=float)
     if vals.size < 5 or np.isnan(observed):
         return {
             "null_mean": np.nan, "null_sd": np.nan, "null_z": np.nan,
+            "null_skew": np.nan, "n_control": int(vals.size),
             "null_p_empirical": np.nan, "null_p": np.nan,
         }
     mu, sd = float(vals.mean()), float(vals.std(ddof=1))
@@ -205,6 +413,8 @@ def empirical_null(observed: float, null_values: list[float]) -> dict[str, float
         "null_mean": mu,
         "null_sd": sd,
         "null_z": z,
+        "null_skew": float(((vals - mu) ** 3).mean() / sd**3) if sd > 0 else np.nan,
+        "n_control": int(vals.size),
         "null_p_empirical": float((np.sum(vals >= observed) + 1) / (vals.size + 1)),
         "null_p": float(stats.norm.sf(z)) if np.isfinite(z) else np.nan,
     }

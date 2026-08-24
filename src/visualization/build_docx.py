@@ -177,6 +177,27 @@ def main(argv: list[str] | None = None) -> int:
     if not targets:
         print("変換対象の Markdown がない")
         return 1
+    # 書き込めるかを先に全部確かめる。
+    # Word で開いたままの .docx は上書きできず、途中まで生成して止まると
+    # 「一部だけ新しい docx」ができる。実際にそれをレビュアーに送ってしまい、
+    # 解決済みの指摘が再び返ってきた。1 つでもロックされていたら何も書かない。
+    locked = []
+    for md in targets:
+        out = md.with_suffix(".docx")
+        if not out.exists():
+            continue
+        try:
+            with out.open("r+b"):
+                pass
+        except OSError:
+            locked.append(out.name)
+    if locked:
+        print("★ 次のファイルが開かれていて上書きできない。閉じてから再実行する:")
+        for name in locked:
+            print(f"    {name}")
+        print("  1 つでもロックされていると一部だけ古い docx が残るので、何も書かない。")
+        return 1
+
     for md in targets:
         convert(md, md.with_suffix(".docx"))
     return 0

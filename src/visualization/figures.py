@@ -559,7 +559,9 @@ def main() -> int:
         return 1
     df = pd.read_csv(path)
     print(f"{len(df)} sets を読んだ")
-    fig1_dissociation(df, cfg)
+    fig1_dissociation(df, cfg)   # パネル B の素材。本文からは参照しない
+    from .fig1_overview import build as build_fig1_overview
+    build_fig1_overview(cfg)     # 本文の図 1（4 パネルの入口図）
     fig2_by_family(df, cfg)
     fig3_method_agreement(df, cfg)
     fig4_qualification_map(df, cfg)

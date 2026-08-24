@@ -1,0 +1,4 @@
+set,family,icc,最大相関の相手,最大相関,rho_B Cells,rho_Monocytes,rho_Neutrophils,rho_NK Cells,rho_Platelets,rho_T Cells,rho_T Cells Naive,rho_T Memory Cells
+pathway|Binding of TCF LEF CTNNB1 to Target Gene Promoters,pathway,0.8077548361145754,Neutrophils,-0.726,0.019,-0.693,-0.726,0.199,-0.637,0.46,0.283,0.465
+pathway|RUNX3 Regulates WNT Signaling,pathway,0.8170223511101851,Neutrophils,-0.657,0.037,-0.616,-0.657,0.305,-0.57,0.524,0.361,0.528
+data_derived|MODULE_0201,data_derived,0.6712590486854071,T Cells,0.853,0.13,-0.29,-0.328,0.831,-0.099,0.853,0.746,0.762
