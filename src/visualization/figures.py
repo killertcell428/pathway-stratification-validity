@@ -264,13 +264,24 @@ def fig3_method_agreement(df: pd.DataFrame, cfg: dict) -> None:
 
 def fig4_qualification_map(df: pd.DataFrame, cfg: dict) -> None:
     """適格性マップ。条件効果と個人整合性の 2 軸で 4 象限に置く。"""
-    d = df.dropna(subset=["cohens_d", "null_z", "var_null_z"]).copy()
+    d = df.dropna(subset=["cohens_d", "null_q", "var_null_q"]).copy()
     d["x"] = d["cohens_d"].abs()
-    # 2 種の対照のうち厳しい側の z。図の縦軸と本文の合格判定を一致させる
-    d["y"] = d[["null_z", "var_null_z"]].min(axis=1).clip(-5, 25)
+    # 縦軸は q 値にする。
+    #
+    # 以前は「厳しい側の z」を縦軸に置き、合格セットの z の最小値を水平線として
+    # 「BH-FDR 0.05 の境界」と書いていた。これは成り立たない。BH の閾値は順位に
+    # 依存し、しかも各セットの帰無分布は形が違うので、全セット共通の z が
+    # BH-FDR 0.05 の境界になることはない。実際に描いていたのは合格集合の
+    # 下端であって、判定境界ではなかった（正規近似時代の設計の名残）。
+    #
+    # 2 つの対照の q の大きい側（＝厳しい側）を取り、-log10 にすると、
+    # 水平線 -log10(0.05) = 1.301 がそのまま合格境界になる。
+    # coherence_pass（両方の q < 0.05）と図が厳密に一致する。
+    d["q_worse"] = d[["null_q", "var_null_q"]].max(axis=1)
+    d["y"] = -np.log10(d["q_worse"])
     d["pass_y"] = coherence_pass(d)
     x_thr = 0.5
-    y_thr = float(d.loc[d["pass_y"], "y"].min()) if d["pass_y"].any() else 2.0
+    y_thr = -np.log10(0.05)
 
     fig, ax = plt.subplots(figsize=(6.5, 5.0))
     ax.scatter(d["x"], d["y"], s=6, c=SUBTLE, alpha=0.35, linewidths=0)
@@ -292,11 +303,17 @@ def fig4_qualification_map(df: pd.DataFrame, cfg: dict) -> None:
         "individual only": ((d.x < x_thr) & d.pass_y).sum(),
         "neither": ((d.x < x_thr) & ~d.pass_y).sum(),
     }
+    # 象限ラベルは軸の隅に置く。合格側は上、不合格側は下。
+    # 上端に余白を作らないと「individual only」の箱が点群に食い込む。
     xmax = d["x"].max()
-    ybot = float(d["y"].min())
+    ybot, ytop = float(d["y"].min()), float(d["y"].max())
+    # 下端にも余白を作る。ファミリー中央値の四角（C・R）が y ≈ 0.1-0.2 に来るので、
+    # 不合格側の箱をその下に逃がさないと重なる。
+    ax.set_ylim(ybot - 0.52, ytop + 0.45)
+    y_hi, y_lo = ytop + 0.40, ybot - 0.06
     positions = [
-        (xmax * 0.66, 24.0), (xmax * 0.66, ybot + 2.0),
-        (0.02, 24.0), (0.02, ybot + 2.0),
+        (xmax * 0.60, y_hi), (xmax * 0.60, y_lo),
+        (0.02, y_hi), (0.02, y_lo),
     ]
     for (label, n), (px, py) in zip(quad.items(), positions):
         ax.text(px, py, f"{label}\nn={n} ({n/len(d):.0%})", fontsize=9, color=INK,
@@ -312,16 +329,20 @@ def fig4_qualification_map(df: pd.DataFrame, cfg: dict) -> None:
             bbox=dict(facecolor="white", edgecolor=HAIRLINE, linewidth=0.8, pad=4))
 
     ax.set_xlabel("Condition effect  |Cohen's d|", fontsize=10, color=INK)
-    ax.set_ylabel("Individual-level coherence\n(z vs the stricter of two random-set controls)",
+    # 縦軸ラベルは 2 行に抑える。3 行にすると図の上端まで届いて表題に当たる。
+    ax.set_ylabel("Individual-level coherence\n−log₁₀ q (weaker control)",
                   fontsize=10, color=INK)
     fig.text(0.012, 0.965, "Qualification map for individual stratification",
              fontsize=11, color=INK, va="top")
     _style(ax)
     _save(fig, "fig4_qualification_map", cfg, top=0.93,
-          footnote=f"Horizontal line = BH-FDR 0.05 boundary against both controls (z={y_thr:.2f}); "
-              f"vertical line |d|={x_thr} is provisional. Squares mark family medians. "
-              "Test-retest reliability is absent: the cohort has no repeated measurement "
-              "of the same condition.")
+          footnote="The vertical axis is the BH-FDR q-value from the empirical p-values "
+              "against 10,000 matched random sets, taken as the weaker of the two controls "
+              f"and plotted as −log₁₀. The horizontal line is therefore the qualification "
+              f"boundary itself, q = 0.05 (−log₁₀ q = {y_thr:.3f}). The vertical line "
+              f"|d| = {x_thr} is provisional and is not used in the decision. "
+              "Squares mark family medians. Test-retest reliability is absent: the cohort "
+              "has no repeated measurement of the same condition.")
 
 
 
@@ -341,17 +362,27 @@ def fig5_retest(cfg: dict) -> None:
                alpha=0.45, linewidths=0, label=f"indistinguishable from controls (n={int((~passes).sum())})")
     ax.scatter(d.loc[passes, "icc_null_mean"], d.loc[passes, "icc"], s=26, c=INK,
                linewidths=0, label=f"exceeds matched controls (n={int(passes.sum())})")
-    # ラベルが重なるので、順位に応じて縦にずらして引き出す
+    # ラベルは全部まとめて右側の空白へ引き出す。
+    #
+    # 点群は x ≈ 0.30-0.46 の帯に集まり、その右（x > 0.5）は破線しかない空白である。
+    # 以前は上位 2 点だけ左へ出していたが、この 2 点は ICC 0.817 と 0.808 で
+    # ほぼ同座標にあるため 2 行が詰まって読めず、左へ長く伸ばすと y 軸ラベルに
+    # 突き抜けた。右側に一列で積めば、行間を確保しつつ
+    # "Binding of TCF LEF CTNNB1 to Target Gene Promoters" も省略せずに収まる。
+    # 長いセット名は 2 行に折り返す。x 軸を伸ばして横幅を稼ぐと点群が左に潰れ、
+    # 「注釈セットが対照より上にしか出ない」という図の主眼が読めなくなる。
     top = d[passes].nlargest(5, "icc").reset_index(drop=True)
+    label_x = 0.50                      # 引き出し先の x（点群の右の空白）
+    # 上 2 件は 2 行に折り返されるので、その分だけ間隔を広く取る
+    label_y = [0.830, 0.725, 0.650, 0.588, 0.526]
     for i, r in top.iterrows():
-        name = r["set"].split("|")[1]
-        name = name if len(name) <= 34 else name[:32] + "…"
-        # 上端の点は左に、それ以外は右に出す（軸外へのはみ出しを避ける）
-        left = r["icc"] > 0.75
-        ax.annotate(name, (r["icc_null_mean"], r["icc"]), textcoords="offset points",
-                    xytext=(-16, -14 - 13 * i) if left else (16, 24 - 13 * i),
-                    fontsize=8.5, color=BLUE, ha="right" if left else "left",
-                    arrowprops=dict(arrowstyle="-", color=BLUE, linewidth=0.7, shrinkA=0, shrinkB=2))
+        ax.annotate(textwrap.fill(r["set"].split("|")[1], width=26),
+                    xy=(r["icc_null_mean"], r["icc"]),
+                    xytext=(label_x, label_y[i]),
+                    fontsize=8.5, color=BLUE, ha="left", va="center",
+                    linespacing=1.35,
+                    arrowprops=dict(arrowstyle="-", color=BLUE, linewidth=0.7,
+                                    shrinkA=2, shrinkB=3))
 
     ax.set_xlim(*lim)
     ax.set_ylim(*lim)
@@ -393,15 +424,21 @@ def fig6_phenotype_rerandomized(cfg: dict) -> None:
                s=30, c=INK, linewidths=0,
                label=f"passed the reliability criterion (n={int(icc_pass.sum())})")
 
-    ax.text(thr + 0.3, ax.get_ylim()[1], f"beats controls at day 0 only\nn={n0 - both}",
+    # 区画のラベルは「day 0 only / day -7 only」で対にする。
+    # 以前は左上を "beats controls at day 0 only" にしていたが、右へ張り出して
+    # both draws の注釈と重なった。上の見出しで既に「対照を上回る」と言っている。
+    ax.text(thr + 0.3, ax.get_ylim()[1], f"day 0 only\nn={n0 - both}",
             fontsize=9, color=INK, va="top",
             bbox=dict(facecolor="white", edgecolor=HAIRLINE, linewidth=0.8, pad=4))
     ax.text(ax.get_xlim()[0] + 0.2, thr - 0.4, f"day -7 only\nn={n7 - both}",
             fontsize=9, color=INK, va="top",
             bbox=dict(facecolor="white", edgecolor=HAIRLINE, linewidth=0.8, pad=4))
+    # both draws の注釈は右下から引く。右上に置くと "day 0 only" の箱に当たる。
     ax.annotate(f"both draws\nn={both} (chance: {expected:.0f})",
-                xy=(thr + 0.2, thr + 0.2), xytext=(thr + 2.2, thr + 2.6), fontsize=9, color=BLUE,
-                arrowprops=dict(arrowstyle="->", color=BLUE, linewidth=0.9))
+                xy=(thr + 0.15, thr + 0.15), xytext=(thr + 1.5, thr + 1.5),
+                fontsize=9, color=BLUE, ha="left", va="bottom",
+                arrowprops=dict(arrowstyle="->", color=BLUE, linewidth=0.9,
+                                shrinkA=2, shrinkB=2))
 
     ax.set_xlabel("Excess association with vaccine response at day 0  (z vs matched random sets)",
                   fontsize=10, color=INK)

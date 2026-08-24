@@ -797,11 +797,15 @@ def table_rows() -> list[tuple[str, str, str]]:
     n_ag, n_tot, worst = oneway_vs_tables_3(PAPER_3C)
 
     return [
+        # 原稿は「9 項目のうち 4 項目一致、残る 5 項目は対照の引き直しによる差」と書き、
+        # 最大差を「0.125 対 0.133」という実値の対で示している。差の絶対値ではなく
+        # この対を照合する（差だけを照合していた頃は、重複していた旧ブロックの
+        # 「最大 0.008」という言い方に引っ張られていた）。
         ("表 3c と表 3・表 3b の一致数",
-         f"{n_tot} 項目のうち表 3・表 3b と小数第 3 位まで一致するのは {n_ag} 項目で、"
-         f"残りの差は最大 {worst:.3f} にとどまる",
-         f"Four of its {n_tot} entries match Tables 3 and 3b to three decimals, and "
-         f"the largest discrepancy among the rest is {worst:.3f}"),
+         f"表 3・表 3b と一致するのは {n_tot} 項目のうち {n_ag} 項目で、"
+         f"残る {n_tot - n_ag} 項目は対照の引き直しによる差が残る",
+         f"It agrees with Tables 3 and 3b for four of the nine entries; "
+         f"the other five differ because the controls are redrawn"),
         ("図 1 パネル B の 4 区画", _reg_ja(rb), _reg_en(rb)),
         ("図 1 パネル C の 4 区画（GSE81046）", _reg_ja(rc), _reg_en(rc)),
         ("表 6 2 標準偏差超え",

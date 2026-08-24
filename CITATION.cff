@@ -5,13 +5,14 @@ abstract: >-
   公開摂動トランスクリプトームを用い、遺伝子セットスコアの条件効果と個人間整合性を
   分離して評価する。個人層別化に用いるスコアの適格性基準を構築するための実装。
 type: software
-version: 0.1.0
-date-released: "2026-08-03"
+version: 0.1.0  # TODO タグ付け時に更新（例: 1.0.0）
+date-released: "2026-08-03"  # TODO タグ付け時に更新
 license: MIT
 authors:
-  - given-names: "[TBA]"
-    family-names: "[TBA]"
-    orcid: "[TBA]"
+  - given-names: "Ryota"
+    family-names: "Ueda"
+    orcid: "https://orcid.org/0009-0004-7269-4424"
+    affiliation: "Independent Researcher, Japan"
 keywords:
   - gene set scoring
   - patient stratification
