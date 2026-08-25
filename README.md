@@ -1,4 +1,4 @@
-﻿# pathway-stratification-validity
+# pathway-stratification-validity
 
 遺伝子セットスコアは、個人の機能特性を測れるのか。
 
@@ -6,7 +6,7 @@
 
 公開摂動トランスクリプトーム（CD14+ 精製単球、同一個人の安静時と刺激後）を使い、条件効果・個人間整合性・摂動をまたいだ順位一貫性を**分離して**評価し、「個人層別化に使える遺伝子セットの成立条件」を定量化する。
 
-> **予備知識なしで読める解説**: [`docs/04-ここまでの成果_やさしい解説.html`](docs/04-ここまでの成果_やさしい解説.html)（高校生物までを前提、用語の対応表つき）
+> **予備知識なしで読める解説**: [`docs/public/04-ここまでの成果_やさしい解説.html`](docs/public/04-ここまでの成果_やさしい解説.html)（高校生物までを前提、用語の対応表つき）
 >
 > 状態: プレプリント投稿準備中。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
 
@@ -130,7 +130,7 @@
 
 **正規化の選択で対照の水準が桁で変わる**ことも判明した。同じ 11,623 遺伝子・同じ 79 名で定量だけ差し替えると、log2(TPM+1) は PC1 が 45.3% を占め各検体の平均発現量と ρ = 0.977（複雑度アーティファクト）、ランダム対照の整合性は 0.168。分位正規化で 0.002、TMM log-CPM（edgeR 標準）で 0.012 まで下がる。**対照の水準が 70 倍動く。**ただし検出率との関連はどの正規化でも消えない（|ρ| = 0.600 / 0.559 / 0.585）。**中心主張「絶対値を根拠にせず対照との差で報告する」の前処理側からの裏づけになる。**
 
-詳細は [`docs/06-WP1結果_RNAseq再現.html`](docs/06-WP1結果_RNAseq再現.html)。
+詳細は [`docs/public/06-WP1結果_RNAseq再現.html`](docs/public/06-WP1結果_RNAseq再現.html)。
 
 図は [`results/figures/`](results/figures)、全数値は [`results/tables/gene_set_metrics.csv`](results/tables)（反復測定は `retest_metrics.csv`、表現型は `phenotype_metrics.csv`）。
 
@@ -193,7 +193,7 @@ src/         download / preprocessing / scoring / reliability / visualization
 tests/       合成データによる指標の妥当性テスト
 data/        raw（Git 管理外）/ interim / metadata / checksums
 results/     tables / figures
-docs/        コンセプトペーパー・やさしい解説（一部は公開対象外。`.gitignore` 参照）
+docs/public/ 読み手向けの解説（公開対象）。docs/ の他は検討過程・レビュー記録で公開対象外
 manuscript/  投稿原稿（公開対象外。プレプリントは bioRxiv で公開する）
 ```
 

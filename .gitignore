@@ -30,9 +30,8 @@ manuscript/
 
 # 読み手向けの解説だけを公開する。残りは検討過程・レビュー記録・作業メモ
 docs/*
-!docs/01-*
-!docs/04-*
-!docs/06-*
+!docs/public/
+
 # コンセプトペーパーの生成コード。本文が埋め込まれているので、生成物と同じ扱いにする
 src/visualization/build_concept_paper.py
 
