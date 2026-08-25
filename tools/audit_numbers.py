@@ -118,6 +118,68 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("評価したセット数", len(m), 0)
     add("条件効果の Cohen の d の中央値", m.cohens_d.abs().median(), 3, required=False)
 
+    # --- 図 7: 2 採血の重なり（キャプションが引く排他カウント）---
+    # 図中のラベルは「その採血でのみ通った数」なので、通った総数とは違う。
+    # 生成コード fig6_phenotype_rerandomized と同じ定義で数え直す。
+    _ph = load("phenotype_metrics.csv")
+    _z0 = int((_ph.abs_rho_z > 2).sum())
+    _z7 = int((_ph["abs_rho_z_day-7"] > 2).sum())
+    _both = int(((_ph.abs_rho_z > 2) & (_ph["abs_rho_z_day-7"] > 2)).sum())
+    add("[図7] day 0 のみで通った数", _z0 - _both, 0, required=False)
+    add("[図7] day -7 のみで通った数", _z7 - _both, 0, required=False)
+    add("[図7] 両方で通った数", _both, 0, required=False)
+    add("[図7] 両方で通る偶然期待値", _z0 * _z7 / len(_ph), 0, required=False)
+
+    # --- 図 5: コホート横断の PC1 帰属（キャプションが引く値）---
+    # 図の生成コード fig7_cross_cohort_attribution と同じ表・同じ行から取る。
+    ta = load("technical_axes.csv")
+    ta = ta[ta.pc == "PC1"]
+    add("[図5 全血] 民族の超過説明率",
+        float(ta[ta.factor == "ethnicity"].r2_excess.iloc[0]), 3, required=False)
+    gtx = pd.read_csv(T / "gtex_blood" / "pc_attribution.csv")
+    gtx = gtx[gtx.pc == "PC1"]
+    add("[図5 GTEx] 虚血時間の超過説明率",
+        float(gtx[gtx.factor == "SMTSISCH"].excess.iloc[0]), 3, required=False)
+    add("[図5 GTEx] 年齢の超過説明率",
+        float(gtx[gtx.factor == "AGE"].excess.iloc[0]), 3, required=False)
+
+    # --- 図 6: 対照を上回らなかったセット数（キャプションの内訳）---
+    rt = load("retest_metrics.csv")
+    add("反復測定で対照を上回らなかったセット数",
+        len(rt) - int(rt.icc_q.lt(0.05).sum()), 0, required=False)
+
+    # --- 図 3: 共変動の水準別に見た手法間一致度 ---
+    # 図 3 のキャプションが区間ごとのセット数と最不一致対の中央値を引く。
+    # 図の生成コード（fig3_method_agreement）と同じ区間で数え直して照合対象にする。
+    for lo, hi in ((-1, 0.02), (0.02, 0.05), (0.05, 0.1), (0.1, 0.3), (0.3, 1.0)):
+        k = (m.internal_consistency >= lo) & (m.internal_consistency < hi)
+        tag = f"<{hi}" if lo < 0 else f"{lo}-{hi}"
+        # キャプションが引く値は qc_tables が逆向きに照合するので、
+        # ここでは計算だけしておき、本文に出るかどうかは必須にしない。
+        add(f"[図3 {tag}] セット数", int(k.sum()), 0, required=False)
+        add(f"[図3 {tag}] 全手法対の平均", m.loc[k, "method_agreement_mean"].median(), 3,
+            required=False)
+        add(f"[図3 {tag}] 最不一致対", m.loc[k, "method_agreement_min"].median(), 3,
+            required=False)
+
+    # --- ファミリーのサイズ帯の偏り ---
+    # 図 2 のキャプションが「ファミリーの上下をそのまま比べてはならない」根拠として
+    # この 2 件を引く。サイズ帯が重なっていないことを数で示す部分なので照合対象にする。
+    add("CORUM 複合体のうち 25 遺伝子以下の件数",
+        (m[(m.family == "complex") & (m.n_genes_tested <= 25)]).shape[0], 0)
+    add("細胞種マーカーのうち 61-200 遺伝子の件数",
+        (m[(m.family == "celltype") & m.n_genes_tested.between(61, 200)]).shape[0], 0)
+
+    # --- 参照アンカー NOX2 複合体 ---
+    # 図 1B のキャプションが「条件効果は明快だが安静時の共変動は対照を下回る」典型例として
+    # この 2 値を名指しで引くので、機械照合の対象に入れる（qc_tables が図キャプションを
+    # 逆向きに検査するため、ここに無いと裏付けなしとして落ちる）。
+    nox2 = m[m.set == "anchor|NOX2_complex"]
+    if len(nox2) == 1:
+        r = nox2.iloc[0]
+        add("NOX2 アンカーの条件効果 |d|", abs(r.cohens_d), 2)
+        add("NOX2 アンカーの内部整合性", r.internal_consistency, 3)
+
     # --- ファミリー別 ---
     # ファミリー別の合格率は「2 種の対照の両方を通る」厳しい側で数える。
     # family_summary.csv の ic_above_varnull_frac は分散そろえ対照だけの
