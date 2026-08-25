@@ -33,6 +33,9 @@ docs/*
 !docs/01-*
 !docs/04-*
 !docs/06-*
+# コンセプトペーパーの生成コード。本文が埋め込まれているので、生成物と同じ扱いにする
+src/visualization/build_concept_paper.py
+
 
 # 改稿の作業記録。当時の数値を含むので、公開すると誤読の元になる
 tools/_edits/
