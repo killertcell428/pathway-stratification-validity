@@ -36,19 +36,6 @@ discovery:
       「摂動をまたいだ順位の一貫性」（LPS 24h vs IFN-gamma 24h の同一個人比較）であり、
       test-retest とは別の軸として扱う。
 
-  gse279480:
-    accession: GSE279480
-    source: GEO
-    citation: "[TBA] シリーズ本文で確認して記入する"
-    design: 全血
-    role: |
-      第 2 発見コホート。全血なので細胞組成が交絡する。
-      交絡ありデータでの挙動を見る対照として使う（主張の主軸には置かない）。
-    urls:
-      series_matrix: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE279nnn/GSE279480/matrix/GSE279480_series_matrix.txt.gz
-      counts: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE279nnn/GSE279480/suppl/GSE279480_P441_genecounts.csv.gz
-    status: 未組み込み（Wave 2 で追加）
-
 # 外部検証コホート。反復測定・別プラットフォーム・表現型を持つデータで、
 # 発見コホートで測れなかった評価軸を埋める。
 validation:
