@@ -504,11 +504,13 @@ footer.doc a{color:var(--inverse-ink);}
 
 <p>投稿前に、原稿そのものが壊れていないかを 3 本立てで検査した。<strong>主張の中身を変える作業ではなく、配管の点検である。</strong></p>
 
+<p>これとは別に、<strong>結論を作ってしまいかねない前提を 3 つ、後から潰した。</strong>対照を全遺伝子から引いていること（注釈遺伝子だけのプールに替えても合格率は 5.1% から 4.6% までしか動かない）、重複するセットを別々に数えていること（Jaccard 0.5 でまとめると 2,195 件が 1,423 単位になり、合格率は下がるどころか上がる）、先行研究を語で探していること（最近接 4 研究の引用を前後にたどり、検索で出ていない 637 件を追加で調べたが、基準を満たすものはなかった）である。いずれも <code>pixi run null-model</code>、<code>redundancy</code>、<code>citation-chase</code> で再走行できる。</p>
+
 <table>
   <thead><tr><th style="width:20%">検査</th><th style="width:16%">状態</th><th>やったこと・見つかったこと</th></tr></thead>
   <tbody>
-    <tr><td><strong>数値の照合</strong></td><td>完了<br>必須 453 / 453 一致</td><td>原稿の全数値を解析出力の CSV と機械照合した。<strong>原稿の数値をスクリプトに書き写すと、その転記自体が新しいミス源になる</strong>ので、CSV から真の値を計算して原稿本文を検索する方式にした。<code>pixi run audit</code> でいつでも再実行できる。<strong>ここで上記の集計方法の不統一（4.199 対 1.510）を検出した。</strong></td></tr>
-    <tr><td><strong>引用の実在性</strong></td><td>完了<br>25 / 25 実在</td><td>PubMed（19 件）・Crossref（4 件）・プレプリント掲載ページ（2 件）で全件照合。捏造ゼロ、誤帰属ゼロ。さらに<strong>本文での使われ方</strong>を出典に当たって確認し、先行ベンチマークの扱いに 2 件の不正確を見つけて修正した（上の 5 節を参照）。検証日・照合先・全 25 件の判定は著者が引用検証ログとして保持している</td></tr>
+    <tr><td><strong>数値の照合</strong></td><td>完了<br>必須 496 / 496 一致</td><td>原稿の全数値を解析出力の CSV と機械照合した。<strong>原稿の数値をスクリプトに書き写すと、その転記自体が新しいミス源になる</strong>ので、CSV から真の値を計算して原稿本文を検索する方式にした。<code>pixi run audit</code> でいつでも再実行できる。<strong>ここで上記の集計方法の不統一（4.199 対 1.510）を検出した。</strong></td></tr>
+    <tr><td><strong>引用の実在性</strong></td><td>完了<br>27 / 27 実在</td><td>PubMed（21 件）・Crossref（4 件）・プレプリント掲載ページ（2 件）で全件照合。捏造ゼロ、誤帰属ゼロ。さらに<strong>本文での使われ方</strong>を出典に当たって確認し、先行ベンチマークの扱いに 2 件の不正確を見つけて修正した（上の 5 節を参照）。検証日・照合先・全 27 件の判定は著者が引用検証ログとして保持している</td></tr>
     <tr><td><strong>AI 検出器</strong></td><td>完了</td><td>解析環境から外部サービスを呼べないため人が実行した。生成 AI の利用そのものは原稿の開示節に記載している（起草・改稿とコードの記述に用い、研究上の判断と検証は著者が行った）</td></tr>
   </tbody>
 </table>
@@ -533,7 +535,7 @@ footer.doc a{color:var(--inverse-ink);}
 <footer class="doc">
   <div class="wrap">
     <h4>遺伝子セットスコアで個人を順位づけできるか — ここまでの成果</h4>
-    <p>数値はすべて <code>results/tables/</code> の解析結果に基づき、<code>pixi run audit</code> で原稿との一致を機械照合している（必須 453 / 453 一致）。図は研究本体と同一の出力。</p>
+    <p>数値はすべて <code>results/tables/</code> の解析結果に基づき、<code>pixi run audit</code> で原稿との一致を機械照合している（必須 496 / 496 一致）。図は研究本体と同一の出力。</p>
     <p>使用データ: E-MTAB-2232（ArrayExpress）、GSE47353・GSE35846・GSE81046（GEO）、GTEx v8（GTEx Portal）、CORUM / Reactome / MSigDB Hallmark / TRRUST / PanglaoDB（Enrichr 経由）。文献情報は PubMed および PubMed Central により確認（2026-08-08、9 件すべて実在・メタデータ一致）。</p>
   </div>
 </footer>
