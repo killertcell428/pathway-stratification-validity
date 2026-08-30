@@ -346,7 +346,7 @@ def fig4_qualification_map(df: pd.DataFrame, cfg: dict) -> None:
 
 
 
-def fig5_retest(cfg: dict) -> None:
+def fig6_retest(cfg: dict) -> None:
     """反復測定信頼性は、ほぼ全部が非特異的な床である。"""
     path = TABLES / "retest_metrics.csv"
     if not path.exists():
@@ -394,14 +394,14 @@ def fig5_retest(cfg: dict) -> None:
     ax.legend(frameon=False, fontsize=9, loc="lower right")  # 左上は注釈と重なる
     _style(ax)
     ax.grid(axis="x", color=HAIRLINE, linewidth=0.8)
-    _save(fig, "fig5_retest_nonspecific", cfg, top=0.93,
+    _save(fig, "fig6_retest_nonspecific", cfg, top=0.93,
           footnote=f"n = {len(d)} gene sets, 56 donors, PBMC (GSE47353). Dashed line: annotated = random. "
               "Points on the line have reliability that any random gene set of the same size "
               "reproduces.")
 
 
 
-def fig6_phenotype_rerandomized(cfg: dict) -> None:
+def fig7_phenotype_rerandomized(cfg: dict) -> None:
     """どのセットが表現型を予測するかは、測定回ごとに引き直される。"""
     path = TABLES / "phenotype_metrics.csv"
     if not path.exists():
@@ -450,14 +450,14 @@ def fig6_phenotype_rerandomized(cfg: dict) -> None:
     ax.legend(frameon=False, fontsize=9, loc="lower left")
     _style(ax)
     ax.grid(axis="x", color=HAIRLINE, linewidth=0.8)
-    _save(fig, "fig6_phenotype_rerandomized", cfg, top=0.93,
+    _save(fig, "fig7_phenotype_rerandomized", cfg, top=0.93,
           footnote="Both draws are pre-vaccination. n = 42 donors with a known response class, "
               f"{len(d)} gene sets. Sets above z = 2 beat their own size- and "
               "expression-matched controls.")
 
 
 
-def fig7_cross_cohort_attribution(cfg: dict) -> None:
+def fig5_cross_cohort_attribution(cfg: dict) -> None:
     """4 コホートで「第 1 主成分を最も説明する要因」が入れ替わることを 1 枚で示す。
 
     各コホートについて PC1 の超過説明率（偶然水準を引いた R^2）の上位を並べ、
@@ -585,7 +585,7 @@ def fig7_cross_cohort_attribution(cfg: dict) -> None:
                loc="upper center", bbox_to_anchor=(0.5, bottom - 0.012))
     fig.text(0.012, bottom - 0.055, footnote, fontsize=8, color=SUBTLE,
              va="top", linespacing=1.5)
-    _save(fig, "fig7_cross_cohort_attribution", cfg, laid_out=True)
+    _save(fig, "fig5_cross_cohort_attribution", cfg, laid_out=True)
 
 
 def main() -> int:
@@ -602,9 +602,9 @@ def main() -> int:
     fig2_by_family(df, cfg)
     fig3_method_agreement(df, cfg)
     fig4_qualification_map(df, cfg)
-    fig5_retest(cfg)
-    fig6_phenotype_rerandomized(cfg)
-    fig7_cross_cohort_attribution(cfg)
+    fig6_retest(cfg)
+    fig7_phenotype_rerandomized(cfg)
+    fig5_cross_cohort_attribution(cfg)
     return 0
 
 
