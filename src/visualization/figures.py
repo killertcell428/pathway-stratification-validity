@@ -413,7 +413,6 @@ def fig7_phenotype_rerandomized(cfg: dict) -> None:
     n0 = int((d.abs_rho_z > thr).sum())
     n7 = int((d["abs_rho_z_day-7"] > thr).sum())
     both = int(((d.abs_rho_z > thr) & (d["abs_rho_z_day-7"] > thr)).sum())
-    expected = n0 * n7 / len(d)
 
     fig, ax = plt.subplots(figsize=(6.5, 5.0))
     ax.axvline(thr, color=INK, linewidth=1.0)
@@ -434,7 +433,9 @@ def fig7_phenotype_rerandomized(cfg: dict) -> None:
             fontsize=9, color=INK, va="top",
             bbox=dict(facecolor="white", edgecolor=HAIRLINE, linewidth=0.8, pad=4))
     # both draws の注釈は右下から引く。右上に置くと "day 0 only" の箱に当たる。
-    ax.annotate(f"both draws\nn={both} (chance: {expected:.0f})",
+    # 偶然期待値 n0*n7/len(d) は独立性を仮定するが、セットは遺伝子を共有していて
+    # 成立しない（表 6 の注記）。判定は BH-FDR で行うので、実数だけを出す。
+    ax.annotate(f"both draws\nn={both}",
                 xy=(thr + 0.15, thr + 0.15), xytext=(thr + 1.5, thr + 1.5),
                 fontsize=9, color=BLUE, ha="left", va="bottom",
                 arrowprops=dict(arrowstyle="->", color=BLUE, linewidth=0.9,

@@ -200,7 +200,6 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("[図7] day 0 のみで通った数", _z0 - _both, 0, required=False)
     add("[図7] day -7 のみで通った数", _z7 - _both, 0, required=False)
     add("[図7] 両方で通った数", _both, 0, required=False)
-    add("[図7] 両方で通る偶然期待値", _z0 * _z7 / len(_ph), 0, required=False)
 
     # --- 図 5: コホート横断の PC1 帰属（キャプションが引く値）---
     # 図の生成コード fig5_cross_cohort_attribution と同じ表・同じ行から取る。
