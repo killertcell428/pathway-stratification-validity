@@ -82,6 +82,7 @@ wp1-muscle-attribution = { cmd = "python -m src.reliability.gtex_attribution", e
 stability-selected = { cmd = "python -m src.reliability.stability_selected_check", description = "Scheid ら [12] の選抜群が対照を超えるか、組成除去の前後で確かめる（3.9 節）" }
 systematic-search = { cmd = "python -m tools.systematic_search", description = "不在の主張を裏づける系統的検索（PubMed / Europe PMC、プレプリント含む）" }
 screen-search = { cmd = "python -m tools.screen_search", description = "系統的検索の結果を 2 段階でふるい、PRISMA の段階別件数を出す" }
+citation-chase = { cmd = "python -m tools.citation_chase", description = "最近接研究の引用を前後にたどり、語の検索が取りこぼした研究がないか確かめる" }
 ssgsea-agreement = { cmd = "python -m src.reliability.ssgsea_agreement", description = "実物の ssGSEA を手法間一致度に加える（3.5 節の穴を塞ぐ）" }
 consistency-definition = { cmd = "python -m src.reliability.consistency_definition", description = "内部整合性を Pearson 版でも取り、結論が保つかを確かめる（3.11 節）" }
 attenuation = { cmd = "python -m src.reliability.attenuation_correction", description = "遺伝子レベル信頼性で減衰補正を当て、判定が動くかを測る（4.3 節）" }
@@ -89,6 +90,8 @@ summarize-sensitivity = { cmd = "python tools/summarize_sensitivity.py", descrip
 passing-overlap = { cmd = "python -m src.reliability.passing_set_overlap", description = "反復測定の基準を通ったセットの内訳と非独立性（Jaccard・実質遺伝子数）を数える（3.10 節）" }
 size-stratified = { cmd = "python -m src.reliability.size_stratified", description = "合格率がセットサイズに規定されていないかを層別で確かめる（3.2 節）" }
 dimensionality = { cmd = "python -m src.reliability.dimensionality_check", description = "遺伝子セットを反映型の尺度として解釈できるかを一次元性と手法依存性で測る" }
+redundancy = { cmd = "python -m src.reliability.redundancy_analysis", description = "遺伝子セットの重複をクラスタにまとめ、有効な単位数で合格率を数え直す" }
+null-model = { cmd = "python -m src.reliability.null_model_sensitivity", description = "対照を注釈遺伝子プールから引いても判定が維持されるかを確かめる（帰無モデルの感度分析）" }
 control-count = { cmd = "python -m src.reliability.control_count_sensitivity", description = "対照セット数 20/100/500 で合格判定が動くかを層化抽出した部分集合で測る（感度分析）" }
 dependency-fdr = { cmd = "python -m src.reliability.dependency_fdr", description = "BH の独立性仮定を外し Benjamini-Yekutieli で判定し直す（3.11 節）" }
 qc-tables = { cmd = "python -m tools.qc_tables", description = "表と図の数値に解析出力の裏付けがあるかを逆向きに検査する（投稿前に audit と一緒に通す）" }

@@ -118,9 +118,81 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("評価したセット数", len(m), 0)
     add("条件効果の Cohen の d の中央値", m.cohens_d.abs().median(), 3, required=False)
 
+    # --- 判定基準をそろえた場合（条件効果も同じ対照に対する超過として測る）---
+    # 条件効果は「条件間の差がゼロか」、内部整合性は「ランダムセットより高いか」を問う。
+    # 帰無仮説が違うものを交差させると、割合の差の一部は判定基準の非対称性から出る。
+    # 条件効果を同じ対照 10,000 組に対する超過として測り直した値を登録する。
+    _cond_pass = m.cond_null_q.lt(0.05)
+    add("条件効果が対照を上回る割合(%)", 100 * _cond_pass.mean(), 1)
+    add("条件効果が対照を上回るセット数", int(_cond_pass.sum()), 0)
+    add("対照基準の交差表: 条件効果のみの割合(%)", 100 * (_cond_pass & ~both).mean(), 1)
+    add("対照基準の交差表: 条件効果のみのセット数", int((_cond_pass & ~both).sum()), 0)
+    add("対照基準の交差表: どちらも通らない割合(%)", 100 * (~_cond_pass & ~both).mean(), 1)
+    add("対照の条件効果 |d| の中央値", m.cond_null_mean.abs().median(), 3)
+    add("条件効果の対照超過 |d| の中央値",
+        (m.cohens_d.abs() - m.cond_null_mean.abs()).median(), 3)
+
+    # --- 同方向性も同じ対照に対する超過として測る ---
+    # 摂動が転写全体を一方向に押すなら、ランダムに集めた遺伝子でも同方向性は高く出る。
+    # 二項検定の帰無（同方向の確率 0.5）は、対照の実測（0.624）より緩い側にずれている。
+    _dir_pass = m.dir_null_q.lt(0.05)
+    add("同方向性が対照を上回る割合(%)", 100 * _dir_pass.mean(), 1)
+    add("同方向性の観測 中央値", m.frac_same_direction.median(), 3)
+    add("同方向性の対照 中央値", m.dir_null_mean.median(), 3)
+    add("同方向性の対照超過 中央値", (m.frac_same_direction - m.dir_null_mean).median(), 3)
+    for fam, lab in (("complex", "CORUM 複合体"), ("regulon", "転写因子レギュロン")):
+        _f = m[m.family == fam]
+        add(f"[{lab}] 同方向性の対照超過 中央値",
+            (_f.frac_same_direction - _f.dir_null_mean).median(), 3)
+
+    # --- ファミリー別の内部整合性の対照超過 ---
+    # 注釈の供給源によって、スコアを反映型の尺度として読むことの妥当性が違う。
+    # 反映型の前提が最も成り立つ発現シグネチャでも超過が小さいことを示すために登録する。
+    # --- 帰無モデルの感度分析（対照を注釈遺伝子プールから引く）---
+    # 対照が「注釈されている遺伝子である」性質を保存していなければ、超過は注釈の質ではなく
+    # プールの違いを測っていることになる。判定がどれだけ動くかを登録する。
+    # --- 遺伝子セットの重複を考慮した有効単位数 ---
+    # 2,195 セットは独立ではない。Jaccard 類似度でまとめた単位で数え直した値を登録する。
+    _rd = load("redundancy_analysis.csv").set_index("jaccard_threshold")
+    for th in (0.5, 0.25):
+        r = _rd.loc[th]
+        add(f"[Jaccard {th}] クラスタ数", int(r.n_clusters), 0)
+        add(f"[Jaccard {th}] クラスタ単位の合格率(%) any", float(r.pass_any_pct), 1)
+        add(f"[Jaccard {th}] クラスタ単位の合格率(%) rep", float(r.pass_rep_pct), 1)
+
+    _nm = load("null_model_sensitivity.csv")
+    add("注釈遺伝子プール対照での合格率(%)", 100 * _nm.pass_annot.mean(), 1)
+    add("全遺伝子プール対照での合格率(%)", 100 * _nm.pass_all.mean(), 1)
+    add("2 つの対照で判定が変わったセット数", int((_nm.pass_all != _nm.pass_annot).sum()), 0)
+    add("注釈遺伝子プール対照の水準 中央値", _nm.null_annot_mean.median(), 4)
+    add("全遺伝子プール対照の水準 中央値", _nm.null_all_mean.median(), 4)
+    # PC1 寄与をそろえた対照（発現量十分位 x PC1 五分位の二重マッチ）
+    add("PC1 そろえ対照での合格率(%)", 100 * _nm.pass_pc1.mean(), 1)
+    add("PC1 そろえ対照の水準 中央値", _nm.null_pc1_mean.median(), 4)
+    add("PC1 そろえで判定が変わったセット数", int((_nm.pass_all != _nm.pass_pc1).sum()), 0)
+    add("注釈遺伝子プール対照での合格セット数", int(_nm.pass_annot.sum()), 0)
+    add("全遺伝子プール対照での合格セット数", int(_nm.pass_all.sum()), 0)
+    add("PC1 そろえ対照での合格セット数", int(_nm.pass_pc1.sum()), 0)
+
+    # --- 引用追跡（語の検索が取りこぼした研究がないかの第 2 経路）---
+    # 不在の主張は経路を 1 本しか持たないと弱い。件数を原稿と機械照合する。
+    _cc = load("citation_chase_summary.csv").set_index("stage")["n"]
+    for k in ("引用関係として取得したレコード（延べ）", "一意のレコード",
+              "うち補遺 S1 の検索で既出", "検索で出ていない新規レコード",
+              "うち抄録が取得できず判定不能", "第 1 段の規則を通過（個別に読む対象）",
+              "選定基準をすべて満たした研究", "基準を満たさないが近い研究（near-miss）"):
+        add(f"[引用追跡] {k}", int(_cc[k]), 0)
+
+    _ic_ex = (m.internal_consistency - m.null_mean).groupby(m.family).median()
+    for key, lab in (("signature", "発現シグネチャ"), ("celltype", "細胞種マーカー"),
+                     ("pathway", "反応経路"), ("complex", "CORUM 複合体"),
+                     ("regulon", "転写因子レギュロン")):
+        if key in _ic_ex.index:
+            add(f"[{lab}] 内部整合性の対照超過 中央値", float(_ic_ex[key]), 4)
+
     # --- 図 7: 2 採血の重なり（キャプションが引く排他カウント）---
     # 図中のラベルは「その採血でのみ通った数」なので、通った総数とは違う。
-    # 生成コード fig6_phenotype_rerandomized と同じ定義で数え直す。
+    # 生成コード fig7_phenotype_rerandomized と同じ定義で数え直す。
     _ph = load("phenotype_metrics.csv")
     _z0 = int((_ph.abs_rho_z > 2).sum())
     _z7 = int((_ph["abs_rho_z_day-7"] > 2).sum())
@@ -131,7 +203,7 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("[図7] 両方で通る偶然期待値", _z0 * _z7 / len(_ph), 0, required=False)
 
     # --- 図 5: コホート横断の PC1 帰属（キャプションが引く値）---
-    # 図の生成コード fig7_cross_cohort_attribution と同じ表・同じ行から取る。
+    # 図の生成コード fig5_cross_cohort_attribution と同じ表・同じ行から取る。
     ta = load("technical_axes.csv")
     ta = ta[ta.pc == "PC1"]
     add("[図5 全血] 民族の超過説明率",
