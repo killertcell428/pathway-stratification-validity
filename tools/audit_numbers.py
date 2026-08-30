@@ -330,6 +330,14 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("GSE81046 PC1 の祖先超過分", p1.excess, 3)
     add("GSE81046 PC1 の寄与率(%)", 100 * p1.var_ratio, 1)
 
+    # --- 通過 17 件が組成マーカーとどれだけ相関するか（対照との比較つき）---
+    # 転写全体が組成の軸に載っているなら、何を集めても組成マーカーと相関する。
+    # 絶対値ではなく対照への超過で見ないと「組成を測っている」とは言えない。
+    _pc = pd.read_csv(T / "passing_set_composition.csv")
+    add("[通過17件] 組成相関が対照を上回る件数", int((_pc.q < 0.05).sum()), 0)
+    add("[通過17件] 組成相関の超過 中央値", float(_pc["超過"].median()), 3)
+    add("[通過17件] 組成相関の対照中央値 の中央値", float(_pc["対照の最大絶対相関 中央値"].median()), 3)
+
     # --- 反復測定信頼性 ---
     rt = load("retest_metrics.csv")
     add("ICC が対照を上回るセットの割合(%)", 100 * rt.icc_q.lt(0.05).mean(), 1)
@@ -360,11 +368,11 @@ def checks() -> list[tuple[str, float, int, bool]]:
     # 細胞種マーカーとラベルされていない通過セットも血球組成を測っているか。
     # 3.9 節の「通過セットは組成に対応する」を、ラベルに頼らず内容で裏づける。
     add("非マーカー通過セット数", po["非マーカー通過セット数"], 0, required=False)
-    add("非マーカーの組成相関の最小絶対値", po["非マーカーの組成相関の絶対値の最小"], 3)
+    add("非マーカーの組成相関の最小絶対値", po["非マーカーの組成相関の絶対値の最小"], 3, required=False)
     try:
         pc = load("passing_set_composition.csv")
         for _, r in pc.iterrows():
-            add(f"[組成相関] {r['set'].split('|')[1][:28]}", r["最大相関"], 3)
+            add(f"[組成相関] {r['set'].split('|')[1][:28]}", r["最大相関"], 3, required=False)
     except FileNotFoundError:
         pass
 

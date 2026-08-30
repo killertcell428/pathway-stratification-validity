@@ -18,13 +18,15 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from itertools import combinations
 
 import numpy as np
 import pandas as pd
 from scipy import stats
+from statsmodels.stats.multitest import multipletests
 
-from ..common import INTERIM, TABLES, load_config
+from ..common import INTERIM, TABLES, gene_mean_path, load_config, rng
 from ..scoring.methods import _standardize_rows
 from .metrics import pooled_set_score
 from .retest_check import RETEST
@@ -35,11 +37,21 @@ REFERENCE_MARKERS = ["T Cells", "T Memory Cells", "T Cells Naive", "B Cells",
                      "NK Cells", "Monocytes", "Neutrophils", "Platelets"]
 
 
-def _composition_correlation(passing, all_sets, genes) -> pd.DataFrame:
-    """細胞種マーカー以外の通過セットと、血球組成マーカーとの順位相関。
+N_COMP_CONTROL = 1_000   # 組成相関の対照数。17 件 x 1,000 なので 10,000 は要らない
+
+
+def _composition_correlation(passing, all_sets, genes, n_control=N_COMP_CONTROL) -> pd.DataFrame:
+    """通過セットと血球組成マーカーの順位相関を、対照と比べて測る。
 
     ラベルが経路やモジュールでも、遺伝子内容が血球系なら組成マーカーと相関する。
     絶対値の最大が大きければ「そのセットは実質的に組成を測っている」と言える。
+
+    **ただし絶対値だけでは足りない。**転写全体が血球組成の軸に載っているなら、
+    どんな遺伝子を集めても組成マーカーと相関する。そこでサイズと平均発現量の十分位を
+    そろえたランダムセットにも同じ「6 マーカーとの最大絶対相関」を計算し、
+    観測値がその分布のどこに来るかを経験 p 値で示す。ここで超過が出なければ、
+    「通過セットは組成を測っている」とは言えず、「この行列では何を集めても組成に
+    載る」と言うべきことになる。
     """
     b = pd.read_parquet(INTERIM / f"valid_expr_{RETEST[1]}.parquet")
     Z = pd.DataFrame(_standardize_rows(b.to_numpy(dtype=np.float64)),
@@ -63,19 +75,54 @@ def _composition_correlation(passing, all_sets, genes) -> pd.DataFrame:
     if not refs:
         return pd.DataFrame()
 
+    # 対照プール: 発現量十分位ごとに、この行列で使える遺伝子を集める
+    gm = pd.read_csv(gene_mean_path(), index_col=0)["mean_expression"]
+    gm = gm.loc[gm.index.intersection(Z.index)]
+    dec = pd.qcut(gm, 10, labels=False, duplicates="drop")
+    pool: dict[int, list[str]] = defaultdict(list)
+    for g, d in dec.items():
+        pool[int(d)].append(g)
+    gen = rng(23)
+
+    def max_abs_corr(gl) -> float | None:
+        s = score(gl)
+        if s is None:
+            return None
+        return max(abs(float(stats.spearmanr(s, v)[0])) for v in refs.values())
+
     rows = []
     for _, r in passing.iterrows():
-        if r["family"] == "celltype":
+        present = [g for g in genes.get(r["set"], []) if g in Z.index and g in dec.index]
+        if len(present) < 2:
             continue
-        s = score(genes.get(r["set"], []))
-        if s is None:
-            continue
+        s = score(present)
         cors = {k: float(stats.spearmanr(s, v)[0]) for k, v in refs.items()}
         best = max(cors, key=lambda k: abs(cors[k]))
+        obs = abs(cors[best])
+        # 同じサイズ・同じ発現量十分位の構成でランダムセットを引き、同じ量を測る
+        decs = [int(dec[g]) for g in present]
+        null = []
+        for _ in range(n_control):
+            draw = [pool[d][int(gen.integers(len(pool[d])))] for d in decs]
+            v = max_abs_corr(draw)
+            if v is not None:
+                null.append(v)
+        null_med = float(np.median(null)) if null else float("nan")
+        p_emp = (sum(1 for v in null if v >= obs) + 1) / (len(null) + 1) if null else float("nan")
         rows.append({"set": r["set"], "family": r["family"], "icc": r["icc"],
                      "最大相関の相手": best, "最大相関": round(cors[best], 3),
+                     "最大絶対相関": round(obs, 3),
+                     "対照の最大絶対相関 中央値": round(null_med, 3),
+                     "超過": round(obs - null_med, 3),
+                     "経験p": round(p_emp, 4),
                      **{f"rho_{k}": round(v, 3) for k, v in cors.items()}})
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        ok = out["経験p"].notna()
+        out["q"] = np.nan
+        if ok.sum() > 1:
+            out.loc[ok, "q"] = multipletests(out.loc[ok, "経験p"], method="fdr_bh")[1]
+    return out
 
 
 def main() -> int:
