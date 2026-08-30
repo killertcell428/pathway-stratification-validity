@@ -72,7 +72,7 @@ footer.doc a{color:var(--inverse-ink);}
   <p class="eyebrow">個人研究 T26 ／ ここまでの成果</p>
   <h1>遺伝子セットスコアで個人を順位づけできるか</h1>
   <p class="lede">「この人はこの経路が高い」という数字が、本当にその人について何かを測っているのかを検証した</p>
-  <p class="meta">2026-08-05 作成 ／ 2026-08-08 更新（RNA-seq 2 コホートを追加、主成分の帰属の集計方法を統一）／ 想定読者: 遺伝子発現解析の基礎（発現量・相関・主成分分析・多重比較）を知っている人 ／ 投稿原稿は <code>manuscript/02-投稿原稿_日本語_v1.docx</code></p>
+  <p class="meta">2026-08-05 作成 ／ 2026-08-26 更新（対照 10,000 個・経験 p 値への切り替え、減衰補正、引用 25 件の検証を反映）／ 想定読者: 遺伝子発現解析の基礎（発現量・相関・主成分分析・多重比較）を知っている人 ／ 論文本体はプレプリントとして bioRxiv で公開する</p>
 </header>
 
 <h2 style="border-top:none; margin-top:24px;">1. この研究は何か</h2>
@@ -242,7 +242,7 @@ footer.doc a{color:var(--inverse-ink);}
 <p>どちらに転んでも論文は成立する立て付けになっています。ただし上に転べば、成果の性質が変わります。</p>
 
 <div class="band"><div class="wrap">
-<p style="margin:0; font-size:15px; color:var(--ink-muted);">ここから先は、上の主張を支える技術的な内容です。定義 → 使ったデータ → 結果 6 つ → 指標の読み方 → 報告すべき項目、の順に並んでいます。</p>
+<p style="margin:0; font-size:15px; color:var(--ink-muted);">ここから先は、上の主張を支える技術的な内容です。定義 → 使ったデータ → 結果 6 つ → 指標の読み方 → 推奨する項目、の順に並んでいます。</p>
 </div></div>
 
 <h2>7. 前提となる 3 つの量</h2>
@@ -410,7 +410,7 @@ footer.doc a{color:var(--inverse-ink);}
 <p>GSE81046 はアフリカ系とヨーロッパ系の免疫応答差を調べるために設計されたコホートである。にもかかわらず、<strong>祖先集団は第 1 主成分（全分散の 35.5%）の 2.0% しか説明しない</strong>。ラベル並べ替えによる偶然水準 1.4% との差は +0.006 にすぎない（p = 0.23）。</p>
 
 <figure>
-  <img src="../results/figures/fig7_cross_cohort_attribution.png" alt="4コホートにおける第1主成分の説明要因の比較">
+  <img src="../results/figures/fig5_cross_cohort_attribution.png" alt="4コホートにおける第1主成分の説明要因の比較">
   <figcaption>図 7。横軸は第 1 主成分の説明率 R² からラベル並べ替えの偶然水準を引いた超過分。各コホートについて分類ごとの最大要因を示す。<strong>細胞組成・採取時の状況・技術のいずれかが常に上位を占め、個人属性（民族・祖先集団・年齢）は一貫して小さい。</strong>正体はコホートごとに入れ替わるが、入れ替わった先も「個人の生物学」ではない。</figcaption>
 </figure>
 
@@ -427,7 +427,7 @@ footer.doc a{color:var(--inverse-ink);}
 <p>対照を上回った 15 件の内訳は、細胞種マーカー 13 件と反応経路 2 件。上位は Neutrophils（0.641）、Megakaryocytes（0.633）、Platelets（0.596）、Monocytes（0.582）。<strong>7 日間隔で安定して再現する個人特性は、血球組成である。</strong></p>
 
 <figure>
-  <img src="../results/figures/fig5_retest_nonspecific.png" alt="注釈セットとランダム対照のICCの散布図">
+  <img src="../results/figures/fig6_retest_nonspecific.png" alt="注釈セットとランダム対照のICCの散布図">
   <figcaption>図 5。横軸が各セットに対応するランダム対照の ICC、縦軸が注釈セット自身の ICC。破線は「注釈セット = ランダム対照」の線。<strong>点が破線上に分布する＝同サイズのランダムな遺伝子でも同じ再現性が得られる。</strong></figcaption>
 </figure>
 
@@ -448,7 +448,7 @@ footer.doc a{color:var(--inverse-ink);}
 <p>本研究自身の予測も外れた。結果 5 で ICC が対照を上回った 15 件は、day0 では |rho| の中央値 0.393（残りは 0.146）だったのに、day-7 では 0.059 に落ち、対照超過の z は 3.10 から −0.41 になる。さらにこの 15 件は独立ではない（13 件が細胞種マーカーで、合計 1,984 遺伝子のうち重複を除くと 826 遺伝子）。<strong>1 つの所見が 13 回数えられていた。</strong></p>
 
 <figure>
-  <img src="../results/figures/fig6_phenotype_rerandomized.png" alt="2回の採血における対照超過の比較">
+  <img src="../results/figures/fig7_phenotype_rerandomized.png" alt="2回の採血における対照超過の比較">
   <figcaption>図 6。横軸が day0 の採血での応答クラスとの相関の対照超過、縦軸が同じ 42 人を 7 日前に測った同じ量。どちらも接種前の採血である。<strong>右上に点がほとんどない</strong>のが結論。</figcaption>
 </figure>
 
@@ -490,15 +490,15 @@ footer.doc a{color:var(--inverse-ink);}
 <h4>スコアリング手法を変えて順位が変わったときの解釈</h4>
 <p>手法間の順位一致度は内部整合性と Spearman 相関 0.565 を示した。内部整合性 0.02 未満のセット（845 件）では、4 手法のうち最も食い違う 2 手法の個人順位相関が中央値 <strong>−0.060</strong>。内部整合性 0.30 以上のセット（74 件）では 0.812 になる。<strong>手法を変えて結論が変わるのは、手法の問題ではなくセットがまとまっていない兆候である。</strong></p>
 
-<h2>11. 個人層別化にセットスコアを使う研究が報告すべき 4 点</h2>
+<h2>11. 個人層別化にセットスコアを使う研究に推奨する 4 点</h2>
 <p>いずれも<strong>絶対値ではなく、サイズと発現量をそろえたランダム対照との差</strong>で報告することが条件になる。</p>
 <ol>
   <li><strong>内部整合性</strong>を、サイズ・発現量マッチ対照と比較して報告する</li>
   <li><strong>反復測定信頼性（ICC）</strong>を、同じ対照と比較して報告する（絶対値の ICC は情報量を持たない）</li>
-  <li>観測された内部整合性が、そのセットが対象とする生物学に<strong>帰属できる</strong>ことを示す（対象組織に存在しない細胞種のセットが同程度に整合的でないことの確認を含む）</li>
+  <li>観測された内部整合性が、そのセットが対象とする生物学に<strong>帰属できる</strong>ことを示す。<strong>その際に集合の遺伝子内容を確認する</strong>（注釈のラベルが中身を記述していないことがある。本研究では整合性が上位に来た細胞種マーカーが、ラベルの細胞種ではなく赤血球・血小板、インターフェロン、細胞周期、マクロファージのプログラムだった）</li>
   <li>主成分と<strong>測定バッチ・細胞組成</strong>の関係を確認する（1 個人 = 1 チップの設計は珍しくなく、全血であれば血球組成が支配する）</li>
 </ol>
-<p>加えて、<strong>表現型との相関を主張する場合は、独立した 2 回目の測定で同じ相関が得られることを示す必要がある。</strong>これは結果 6 から直接導かれる要求である。</p>
+<p>加えて、<strong>表現型との相関を主張する場合は、独立した 2 回目の測定で同じ相関が得られることを確かめるのが望ましい。</strong>これは結果 6 から直接導かれる。</p>
 
 <h2>12. 原稿の点検</h2>
 
@@ -507,9 +507,9 @@ footer.doc a{color:var(--inverse-ink);}
 <table>
   <thead><tr><th style="width:20%">検査</th><th style="width:16%">状態</th><th>やったこと・見つかったこと</th></tr></thead>
   <tbody>
-    <tr><td><strong>数値の照合</strong></td><td>完了<br>必須 59 / 59 一致</td><td>原稿の全数値を解析出力の CSV と機械照合した。<strong>原稿の数値をスクリプトに書き写すと、その転記自体が新しいミス源になる</strong>ので、CSV から真の値を計算して原稿本文を検索する方式にした。<code>pixi run audit</code> でいつでも再実行できる。<strong>ここで上記の集計方法の不統一（4.199 対 1.510）を検出した。</strong></td></tr>
-    <tr><td><strong>引用の実在性</strong></td><td>完了<br>9 / 9 実在</td><td>PubMed で全件照合。捏造ゼロ、誤帰属ゼロ。さらに<strong>本文での使われ方</strong>を出典の全文に当たって確認し、先行ベンチマークの扱いに 2 件の不正確を見つけて修正した（上の 5 節を参照）。記録は <code>manuscript/03-引用検証ログ.md</code></td></tr>
-    <tr><td><strong>AI 検出器</strong></td><td><strong>未実施</strong></td><td>GPTZero・Copyleaks などの外部サービスは解析環境から呼べないため、<strong>人が実行する必要がある</strong></td></tr>
+    <tr><td><strong>数値の照合</strong></td><td>完了<br>必須 453 / 453 一致</td><td>原稿の全数値を解析出力の CSV と機械照合した。<strong>原稿の数値をスクリプトに書き写すと、その転記自体が新しいミス源になる</strong>ので、CSV から真の値を計算して原稿本文を検索する方式にした。<code>pixi run audit</code> でいつでも再実行できる。<strong>ここで上記の集計方法の不統一（4.199 対 1.510）を検出した。</strong></td></tr>
+    <tr><td><strong>引用の実在性</strong></td><td>完了<br>25 / 25 実在</td><td>PubMed（19 件）・Crossref（4 件）・プレプリント掲載ページ（2 件）で全件照合。捏造ゼロ、誤帰属ゼロ。さらに<strong>本文での使われ方</strong>を出典に当たって確認し、先行ベンチマークの扱いに 2 件の不正確を見つけて修正した（上の 5 節を参照）。検証日・照合先・全 25 件の判定は著者が引用検証ログとして保持している</td></tr>
+    <tr><td><strong>AI 検出器</strong></td><td>完了</td><td>解析環境から外部サービスを呼べないため人が実行した。生成 AI の利用そのものは原稿の開示節に記載している（起草・改稿とコードの記述に用い、研究上の判断と検証は著者が行った）</td></tr>
   </tbody>
 </table>
 
@@ -517,10 +517,7 @@ footer.doc a{color:var(--inverse-ink);}
 <table>
   <thead><tr><th style="width:32%">対象</th><th>ファイル</th></tr></thead>
   <tbody>
-    <tr><td><strong>投稿原稿（日本語・Word）</strong></td><td><code>manuscript/02-投稿原稿_日本語_v1.docx</code>（図 7 点・表 6 点を本文に埋め込み済み。原本は同名の <code>.md</code>）</td></tr>
-    <tr><td>引用検証ログ</td><td><code>manuscript/03-引用検証ログ.md</code></td></tr>
-    <tr><td>作業ドラフト（詳細版）</td><td><code>manuscript/01-論文ドラフト.html</code>（実測と仮説をタグで区別）</td></tr>
-    <tr><td>投稿からアクセプトまでの計画</td><td><code>docs/計画と運用/05-研究計画_投稿からアクセプトまで.html</code></td></tr>
+    <tr><td><strong>論文本体</strong></td><td>プレプリントとして bioRxiv で公開する（公開後に DOI を記載）</td></tr>
     <tr><td>WP1（RNA-seq 再現）の結果</td><td><code>docs/public/06-WP1結果_RNAseq再現.html</code></td></tr>
     <tr><td>先行研究との距離の判定</td><td><code>docs/public/01-先行研究の距離判定.html</code></td></tr>
     <tr><td>図 7 枚</td><td><code>results/figures/</code></td></tr>
@@ -536,7 +533,7 @@ footer.doc a{color:var(--inverse-ink);}
 <footer class="doc">
   <div class="wrap">
     <h4>遺伝子セットスコアで個人を順位づけできるか — ここまでの成果</h4>
-    <p>数値はすべて <code>results/tables/</code> の解析結果に基づき、<code>pixi run audit</code> で原稿との一致を機械照合している（必須 59 / 59 一致）。図は研究本体と同一の出力。</p>
+    <p>数値はすべて <code>results/tables/</code> の解析結果に基づき、<code>pixi run audit</code> で原稿との一致を機械照合している（必須 453 / 453 一致）。図は研究本体と同一の出力。</p>
     <p>使用データ: E-MTAB-2232（ArrayExpress）、GSE47353・GSE35846・GSE81046（GEO）、GTEx v8（GTEx Portal）、CORUM / Reactome / MSigDB Hallmark / TRRUST / PanglaoDB（Enrichr 経由）。文献情報は PubMed および PubMed Central により確認（2026-08-08、9 件すべて実在・メタデータ一致）。</p>
   </div>
 </footer>
