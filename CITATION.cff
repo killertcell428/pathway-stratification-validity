@@ -1,13 +1,21 @@
 cff-version: 1.2.0
-message: このリポジトリを利用した場合は下記を引用してください。
-title: "pathway-stratification-validity: 遺伝子セットスコアの個人層別化妥当性を評価するベンチマーク"
+message: "If you use this repository, please cite it as below."
+title: "pathway-stratification-validity: measuring whether annotation-derived gene set scores are reliable enough to rank individuals"
 abstract: >-
-  公開摂動トランスクリプトームを用い、遺伝子セットスコアの条件効果と個人間整合性を
-  分離して評価する。個人層別化に用いるスコアの適格性基準を構築するための実装。
+  Analysis code for evaluating gene set scores as reflective measurement scales for
+  individual-level stratification. Condition effects and individual-level coherence are
+  scored separately, each as an excess over size- and expression-matched random gene sets,
+  so that a set which responds to a perturbation is not mistaken for one that ranks people
+  reliably. Includes the negative-control machinery, the attribution of apparent coherence
+  to the dominant expression axis of each cohort, test-retest reliability against matched
+  controls, and the sensitivity analyses that vary the null model, the definition of
+  coherence, the redundancy of the sets and the preprocessing.
 type: software
-version: 0.1.0  # TODO タグ付け時に更新（例: 1.0.0）
-date-released: "2026-08-03"  # TODO タグ付け時に更新
+version: 0.1.0  # TODO タグ付け時に 1.0.0 へ更新（docs/計画と運用/18 のステップ 1）
+date-released: "2026-08-03"  # TODO タグ付け時に当日の日付へ更新（同上）
 license: MIT
+repository-code: "https://github.com/cytraUeda/pathway-stratification-validity"
+url: "https://github.com/cytraUeda/pathway-stratification-validity"
 authors:
   - given-names: "Ryota"
     family-names: "Ueda"
@@ -15,11 +23,15 @@ authors:
     affiliation: "Independent Researcher, Japan"
 keywords:
   - gene set scoring
+  - single-sample scoring
   - patient stratification
+  - measurement validity
+  - test-retest reliability
+  - negative controls
   - reproducibility
   - transcriptomics
-  - perturbation response
 references:
+  # 解析に使った公開コホート。取得元と sha256 は data/checksums/provenance.jsonl にある。
   - type: article
     authors:
       - family-names: Fairfax
@@ -30,7 +42,51 @@ references:
     volume: "343"
     issue: "6175"
     doi: 10.1126/science.1246949
-    notes: 主発見コホート E-MTAB-2232 の出典
+    notes: "Main cohort E-MTAB-2232 (purified CD14+ monocytes, rest and LPS 24 h)"
+  - type: article
+    authors:
+      - family-names: Tsang
+        given-names: "John S"
+    title: "Global analyses of human immune variation reveal baseline predictors of postvaccination responses"
+    journal: Cell
+    year: 2014
+    volume: "157"
+    issue: "2"
+    doi: 10.1016/j.cell.2014.03.031
+    notes: "GSE47353, used for test-retest reliability across a seven-day interval"
+  - type: article
+    authors:
+      - family-names: Preininger
+        given-names: Marcela
+    title: "Blood-informative transcripts define nine common axes of peripheral blood gene expression"
+    journal: "PLoS Genetics"
+    year: 2013
+    volume: "9"
+    issue: "3"
+    doi: 10.1371/journal.pgen.1003362
+    notes: "GSE35846, used for the attribution of apparent coherence to cell composition"
+  - type: article
+    authors:
+      - family-names: Nédélec
+        given-names: Yohann
+    title: "Genetic ancestry and natural selection drive population differences in immune responses to pathogens"
+    journal: Cell
+    year: 2016
+    volume: "167"
+    issue: "3"
+    doi: 10.1016/j.cell.2016.09.025
+    notes: "GSE81046, the RNA-seq cohort used to reproduce the main findings on a different platform"
+  - type: article
+    authors:
+      - name: "GTEx Consortium"
+    title: "The GTEx Consortium atlas of genetic regulatory effects across human tissues"
+    journal: Science
+    year: 2020
+    volume: "369"
+    issue: "6509"
+    doi: 10.1126/science.aaz1776
+    notes: "GTEx v8 whole blood and skeletal muscle, used to extend the attribution to solid tissue"
+  # 手法側のベンチマーク。本研究は遺伝子セット側を評価対象にする補完的な位置づけ。
   - type: article
     authors:
       - family-names: "Toro-Domínguez"
@@ -41,4 +97,4 @@ references:
     volume: "26"
     issue: "6"
     doi: 10.1093/bib/bbaf684
-    notes: 手法側のベンチマーク。本研究は遺伝子セット側を評価対象にする補完的な位置づけ
+    notes: "Benchmarks the scoring method; this work holds the method fixed and varies the provenance of the set"
