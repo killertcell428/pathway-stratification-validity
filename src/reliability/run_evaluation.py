@@ -25,6 +25,8 @@ from ..download.fetch_gene_sets import parse_gmt
 from ..scoring.methods import METHODS, ScoringContext, score_set
 from .metrics import (
     alpha_from_mean_rho,
+    draw_null_condition_effect,
+    draw_null_direction,
     draw_null_rho,
     pools_as_rows,
     condition_effect,
@@ -118,6 +120,22 @@ def main(argv: list[str] | None = None) -> int:
         expr[resting][val], expr[main_pert][[d for d in val if d in expr[main_pert].columns]]
     )
 
+    # 条件効果も内部整合性と同じ対照に対する超過として測るための行列。
+    # 対照プールは ctx_rest の行番号で持つので、行順をそれに合わせる。
+    delta_z = (z_pert - z_rest).reindex(index=ctx_rest.genes).to_numpy(dtype=np.float64)
+    if np.isnan(delta_z).any():
+        print("  条件間差に NaN がある。条件効果の対照計算の前提が崩れる")
+        return 1
+
+    # 同方向性の対照計算用。遺伝子ごとの中位数差（摂動後 - 安静時）を
+    # ctx_rest の行順で持つ。direction_concordance と同じ量を対照側でも作る。
+    _pd = [d for d in val if d in expr[main_pert].columns]
+    gene_delta = np.nanmedian(
+        expr[main_pert].reindex(index=ctx_rest.genes)[_pd].to_numpy(dtype=np.float64)
+        - expr[resting].reindex(index=ctx_rest.genes)[_pd].to_numpy(dtype=np.float64),
+        axis=1,
+    )
+
     cross_donors = [
         d for d in val if d in expr[pair[0]].columns and d in expr[pair[1]].columns
     ]
@@ -158,6 +176,11 @@ def main(argv: list[str] | None = None) -> int:
     nc_sh = ncfg.get("n_sets_split_half", 20)
     repeats = cfg["metrics"]["internal_consistency"]["split_half_repeats"]
     gen = rng(2)
+    # 条件効果の対照は別の乱数系列で引く。gen を共有すると既存の抽出順が変わり、
+    # 内部整合性側の数値まで動いてしまう。
+    gen_cond = rng(3)
+    # 同方向性の対照も別系列で引く（同じ理由）。
+    gen_dir = rng(4)
 
     # 発現量分位・分散分位のプールを「遺伝子名」ではなく S の行番号で持ち直す。
     # 対照 10,000 個を 1 件ずつ Python で回すと終わらないため、
@@ -223,10 +246,40 @@ def main(argv: list[str] | None = None) -> int:
             pooled_set_score(z_rest.loc[z_genes].to_numpy()),
             pooled_set_score(z_pert.loc[z_genes].to_numpy()),
         )
+        # 条件効果も同じ対照に対する超過として測る。内部整合性は「対照より高いか」を
+        # 問うのに条件効果は「差がゼロか」を問うため、両者の合格率をそのまま交差させると
+        # 差の一部が判定基準の非対称性から生じる。絶対値で比べるのは、条件効果の向きが
+        # セットごとに違い、ここで見たいのが効果の大きさだからである。
+        cond_null = (
+            draw_null_condition_effect(
+                delta_z, pool_expr,
+                np.array([decile_of_gene[g] for g in pos_e]), nc, gen_cond,
+            )
+            if len(pos_e) >= 2
+            else np.array([])
+        )
+        cond = empirical_null(
+            abs(eff["cohens_d"]) if not np.isnan(eff["cohens_d"]) else np.nan,
+            np.abs(cond_null).tolist(),
+        )
+
         conc = direction_concordance(
             expr[resting].loc[[g for g in present if g in expr[resting].index], z_rest.columns].to_numpy(),
             expr[main_pert].loc[[g for g in present if g in expr[main_pert].index], z_rest.columns].to_numpy(),
         )
+
+        # 同方向性も対照に対する超過として測る。摂動が転写全体を一方向に押すなら、
+        # ランダムに集めた遺伝子でも同方向性は高く出るため、対照なしでは注釈セット固有の
+        # 性質と区別できない。
+        dir_null = (
+            draw_null_direction(
+                gene_delta, pool_expr,
+                np.array([decile_of_gene[g] for g in pos_e]), nc, gen_dir,
+            )
+            if len(pos_e) >= 2
+            else np.array([])
+        )
+        dirx = empirical_null(conc["frac_same_direction"], dir_null.tolist())
 
         # 摂動をまたいだ順位の一貫性
         if len(ctx_cross) == 2:
@@ -266,7 +319,9 @@ def main(argv: list[str] | None = None) -> int:
                 **null,
                 **{f"var_{k}": v for k, v in null_var.items()},
                 **eff,
+                **{f"cond_{k}": v for k, v in cond.items()},
                 **conc,
+                **{f"dir_{k}": v for k, v in dirx.items()},
                 "cross_perturbation_rho": cross["rho"],
                 "cross_perturbation_p": cross["rho_p"],
                 "cross_perturbation_tertile_swap": cross["tertile_swap"],
@@ -290,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
         ("delta_p", "delta_q"),
         ("direction_p", "direction_q"),
         ("null_p_empirical", "null_q"),
+        ("cond_null_p_empirical", "cond_null_q"),
+        ("dir_null_p_empirical", "dir_null_q"),
         ("var_null_p_empirical", "var_null_q"),
         ("null_p", "null_q_normal"),
         ("var_null_p", "var_null_q_normal"),

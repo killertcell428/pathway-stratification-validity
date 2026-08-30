@@ -82,6 +82,75 @@ def draw_null_rho(
     return out
 
 
+def draw_null_condition_effect(
+    delta_z: np.ndarray,
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+    chunk: int = 2_000,
+) -> np.ndarray:
+    """分位をそろえたランダムセットの条件効果（対応あり Cohen の d）を n_draw 個作る。
+
+    なぜ要るか
+      条件効果は「条件間の差がゼロか」を問い、内部整合性は「ランダムセットより高いか」を
+      問う。帰無仮説の違うものを交差させると、割合の差の一部は判定基準の非対称性から
+      生じる。条件効果も同じ対照に対する超過として測れば、同じ尺度で並べられる。
+
+    セットスコアは構成遺伝子の z の平均なので、セットの個人ごとの条件間差は
+    delta_z（遺伝子 x 個人の条件間差）の該当行の列平均になる。draw_null_rho と同じ
+    足し込み方式を使うため、行列を実体化せずメモリは chunk x 個人数で決まる。
+    """
+    g = decile_of_position.size
+    n = delta_z.shape[1]
+    out = np.empty(n_draw, dtype=np.float64)
+    filled = 0
+    while filled < n_draw:
+        b = min(chunk, n_draw - filled)
+        acc = np.zeros((b, n), dtype=np.float64)
+        for j in range(g):
+            pool = pool_by_decile[int(decile_of_position[j])]
+            acc += delta_z[pool[generator.integers(pool.size, size=b)]]
+        d = acc / g
+        sd = d.std(axis=1, ddof=1)
+        out[filled : filled + b] = np.where(sd > 0, d.mean(axis=1) / sd, np.nan)
+        filled += b
+    return out
+
+
+def draw_null_direction(
+    gene_delta: np.ndarray,
+    pool_by_decile: dict[int, np.ndarray],
+    decile_of_position: np.ndarray,
+    n_draw: int,
+    generator: np.random.Generator,
+    chunk: int = 2_000,
+) -> np.ndarray:
+    """ランダムセットの「同じ向きに動く遺伝子の割合」を n_draw 個まとめて作る。
+
+    なぜ要るか
+      direction_concordance は注釈セットの構成遺伝子が摂動で同方向に動くかを測るが、
+      対照がない。摂動が転写全体を一方向に押すなら、どの遺伝子を集めても同方向性は
+      高く出る。条件効果と同じ理由で、対照に対する超過として見ないと、この性質が
+      注釈セット固有かどうかは判定できない。
+
+    gene_delta は遺伝子ごとの中位数差（摂動後 - 安静時）。符号だけを使う。
+    """
+    g = decile_of_position.size
+    sign_up = gene_delta > 0
+    out = np.empty(n_draw, dtype=np.float64)
+    filled = 0
+    while filled < n_draw:
+        b = min(chunk, n_draw - filled)
+        up = np.zeros(b, dtype=np.int64)
+        for j in range(g):
+            pool = pool_by_decile[int(decile_of_position[j])]
+            up += sign_up[pool[generator.integers(pool.size, size=b)]]
+        out[filled : filled + b] = np.maximum(up, g - up) / g
+        filled += b
+    return out
+
+
 def pools_as_rows(
     genes_by_decile: dict[int, list[str]], gene_index: dict[str, int]
 ) -> dict[int, np.ndarray]:

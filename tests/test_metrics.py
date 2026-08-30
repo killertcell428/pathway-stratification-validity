@@ -17,6 +17,8 @@ import pytest
 
 from src.reliability.metrics import (
     condition_effect,
+    draw_null_condition_effect,
+    draw_null_direction,
     cronbach_alpha,
     direction_concordance,
     empirical_null,
@@ -170,3 +172,92 @@ def test_scoring_returns_nan_for_missing_genes():
     )
     ctx = ScoringContext(expr)
     assert np.isnan(score_set(ctx, ["NOT_PRESENT"], "zmean")).all()
+
+
+def _pool_and_positions(n_gene_pool: int, g: int) -> tuple[dict[int, np.ndarray], np.ndarray]:
+    """1 分位だけのプールと、位置ごとの分位指定を作る（合成データ用の最小構成）。"""
+    return {0: np.arange(n_gene_pool)}, np.zeros(g, dtype=int)
+
+
+def test_null_condition_effect_is_large_under_a_global_shift():
+    """全遺伝子が一律に動くと、ランダムセットの条件効果も大きく出る。
+
+    これが判定基準の非対称性の核心である。内部整合性の対照はランダムセットで低い
+    （個人間で揃う理由がない）が、条件効果の対照は高い（摂動で全体が動けばどの遺伝子を
+    集めても動く）。したがって「条件効果が有意なセットの割合」と「対照を上回るセットの
+    割合」をそのまま交差させると、差の一部は帰無仮説の違いから生じる。
+    """
+    rs = np.random.default_rng(0)
+    n_gene, n_ind, g = 300, 120, 12
+    delta = 1.0 + 0.15 * rs.normal(size=(n_gene, n_ind))   # 全遺伝子が +1 方向へ
+    pool, pos = _pool_and_positions(n_gene, g)
+    d = draw_null_condition_effect(delta, pool, pos, 200, np.random.default_rng(1))
+    assert np.isfinite(d).all()
+    assert np.median(np.abs(d)) > 2.0, "一律シフトでは対照の条件効果が大きく出るはず"
+
+
+def test_null_condition_effect_is_small_when_only_a_subset_moves():
+    """一部の遺伝子だけが動く場合、ランダムセットの条件効果は小さい。
+
+    このときだけ「対照に対する条件効果の超過」が意味を持つ。上のテストと合わせて、
+    同じ指標が状況によって対照の水準を変えることを示す。
+    """
+    rs = np.random.default_rng(0)
+    n_gene, n_ind, g = 300, 120, 12
+    delta = 0.15 * rs.normal(size=(n_gene, n_ind))
+    delta[:20] += 2.0                                       # 20 遺伝子だけ動く
+    # 対照は動かない遺伝子から引く。全体プールから引くと g = 12 のうち約 56% の対照に
+    # 動く遺伝子が混ざり、対照側も大きく出てしまう（それ自体が上のテストの論点）。
+    pool, pos = {0: np.arange(20, n_gene)}, np.zeros(g, dtype=int)
+    d = draw_null_condition_effect(delta, pool, pos, 200, np.random.default_rng(1))
+    assert np.median(np.abs(d)) < 1.0, "動かない遺伝子から引けば対照の条件効果は小さいはず"
+
+
+def test_null_condition_effect_matches_direct_computation():
+    """足し込み方式が、対照セットを実体化した直接計算と一致する。
+
+    draw_null_rho と同じ最適化を使っているので、同じ乱数系列で同じ値になることを
+    確かめる。ここがずれると、内部整合性側と条件効果側で違う対照を見ることになる。
+    """
+    rs = np.random.default_rng(0)
+    n_gene, n_ind, g, n_draw = 200, 80, 8, 50
+    delta = rs.normal(size=(n_gene, n_ind))
+    pool, pos = _pool_and_positions(n_gene, g)
+
+    fast = draw_null_condition_effect(delta, pool, pos, n_draw, np.random.default_rng(7))
+
+    # 足し込み方式は「位置ごとに n_draw 個まとめて引く」順序で乱数を消費する
+    # （draw_null_rho と同じ）。直接計算もその順序に合わせないと系列がずれる。
+    gen = np.random.default_rng(7)
+    rows_all = np.empty((n_draw, g), dtype=int)
+    for j in range(g):
+        rows_all[:, j] = pool[0][gen.integers(pool[0].size, size=n_draw)]
+    slow = np.array([
+        delta[rows_all[c]].mean(axis=0).mean() / delta[rows_all[c]].mean(axis=0).std(ddof=1)
+        for c in range(n_draw)
+    ])
+    assert np.allclose(fast, slow, atol=1e-12)
+
+
+def test_null_direction_is_high_under_a_global_shift():
+    """全遺伝子が同方向に動くと、ランダムセットの同方向性も 1 に近づく。
+
+    direction_concordance を対照なしで読むと「注釈セットの遺伝子は摂動で揃って動く」と
+    見えるが、摂動が転写全体を一方向に押していれば、どの遺伝子を集めても同じことが
+    起きる。条件効果と同じ構造の交絡である。
+    """
+    gene_delta = np.full(300, 0.5)
+    pool, pos = _pool_and_positions(300, 12)
+    f = draw_null_direction(gene_delta, pool, pos, 200, np.random.default_rng(1))
+    assert np.median(f) > 0.99, "一律に動くなら対照の同方向性も 1 に近いはず"
+
+
+def test_null_direction_is_near_half_when_directions_are_mixed():
+    """上下が半々なら、ランダムセットの同方向性は 0.5 付近に集まる。
+
+    このときだけ「注釈セットの同方向性が対照を超える」ことに意味がある。
+    """
+    gene_delta = np.concatenate([np.full(150, 0.5), np.full(150, -0.5)])
+    pool, pos = _pool_and_positions(300, 40)
+    f = draw_null_direction(gene_delta, pool, pos, 200, np.random.default_rng(1))
+    assert 0.50 <= np.median(f) <= 0.70, "上下半々なら対照の同方向性は 0.5 付近のはず"
