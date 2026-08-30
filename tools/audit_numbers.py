@@ -199,6 +199,12 @@ def checks() -> list[tuple[str, float, int, bool]]:
     _both = int(((_ph.abs_rho_z > 2) & (_ph["abs_rho_z_day-7"] > 2)).sum())
     add("[図7] day 0 のみで通った数", _z0 - _both, 0, required=False)
     add("[図7] day -7 のみで通った数", _z7 - _both, 0, required=False)
+    # 2 時点の一致度。day 0 で選んで day -7 を見る比較は平均への回帰を含むが、
+    # 全セットの順位相関は選択を経ないのでその影響を受けない。
+    add("[表現型] 2 時点の対照超過 z の順位相関",
+        float(_ph[["abs_rho_z", "abs_rho_z_day-7"]].corr(method="spearman").iloc[0, 1]), 3)
+    add("[表現型] 年齢・性別を調整した day 0 の |rho| 中央値",
+        float(_ph.rho_day0_adj.abs().median()), 3)
     add("[図7] 両方で通った数", _both, 0, required=False)
 
     # --- 図 5: コホート横断の PC1 帰属（キャプションが引く値）---
@@ -305,6 +311,16 @@ def checks() -> list[tuple[str, float, int, bool]]:
         for _, r in ci.iterrows():
             add(f"{tag} {r['分類']} 範囲下限", r[lo_col], 3)
             add(f"{tag} {r['分類']} 範囲上限", r[hi_col], 3)
+
+    # --- GSE81046 を共通の対照基準で見たときの区画 ---
+    # 条件効果をゼロ帰無ではなく同じ 10,000 対照への超過で測ると、主コホートと同じ向きになる。
+    _g8 = pd.read_csv(T / "gse81046" / "gene_set_metrics.csv")
+    _g8_ic = _g8.null_q.lt(0.05) & _g8.var_null_q.lt(0.05)
+    _g8_cond = _g8.cond_null_q.lt(0.05)
+    add("GSE81046 共通対照での条件効果(%)", 100 * _g8_cond.mean(), 1)
+    add("GSE81046 共通対照で条件効果のみ(%)", 100 * (_g8_cond & ~_g8_ic).mean(), 1)
+    add("GSE81046 共通対照でどちらも通らない(%)", 100 * (~_g8_cond & ~_g8_ic).mean(), 1)
+    add("GSE81046 条件効果の対照 |d| 中央値", float(_g8.cond_null_mean.median()), 3)
 
     # --- GSE81046（RNA-seq マクロファージ）の祖先集団 ---
     a = pd.read_csv(T / "gse81046" / "ancestry_attribution.csv")
