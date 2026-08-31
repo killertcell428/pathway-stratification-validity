@@ -48,10 +48,22 @@ def _composition_correlation(passing, all_sets, genes, n_control=N_COMP_CONTROL)
 
     **ただし絶対値だけでは足りない。**転写全体が血球組成の軸に載っているなら、
     どんな遺伝子を集めても組成マーカーと相関する。そこでサイズと平均発現量の十分位を
-    そろえたランダムセットにも同じ「6 マーカーとの最大絶対相関」を計算し、
+    そろえたランダムセットにも同じ「マーカーとの最大絶対相関」を計算し、
     観測値がその分布のどこに来るかを経験 p 値で示す。ここで超過が出なければ、
     「通過セットは組成を測っている」とは言えず、「この行列では何を集めても組成に
     載る」と言うべきことになる。
+
+    **さらに、対照と比べても循環が残る。**通過 17 件のうち 14 件は細胞種マーカーで、
+    代理変数に使うマーカー集合と遺伝子を共有する。共有していれば、相関の一部は
+    「同じ遺伝子を両側に入れた」ことの帰結であって、組成との関連の証拠にならない。
+    そこで 2 通りで測る。
+
+      raw    : そのまま（重複を許す）
+      disjoint : 評価セットからマーカー遺伝子の和集合を、各マーカー集合から評価セットの
+                 遺伝子を、**双方から**除いて測り直す。対照も同じプール（マーカー遺伝子を
+                 除いた集合）から引き直す
+
+    disjoint で超過が残れば、相関は共有遺伝子だけでは説明されない。
     """
     b = pd.read_parquet(INTERIM / f"valid_expr_{RETEST[1]}.parquet")
     Z = pd.DataFrame(_standardize_rows(b.to_numpy(dtype=np.float64)),
@@ -90,6 +102,37 @@ def _composition_correlation(passing, all_sets, genes, n_control=N_COMP_CONTROL)
             return None
         return max(abs(float(stats.spearmanr(s, v)[0])) for v in refs.values())
 
+    # マーカー集合の遺伝子（和集合）。disjoint 版で評価セットから除く対象。
+    marker_genes: set[str] = set()
+    marker_members: dict[str, list[str]] = {}
+    for name, (family, gl) in all_sets.items():
+        if family != "celltype":
+            continue
+        label = name.split("|", 1)[1]
+        if label in REFERENCE_MARKERS:
+            marker_members[label] = [g for g in gl if g in Z.index]
+            marker_genes |= set(marker_members[label])
+    pool_disj: dict[int, list[str]] = {
+        d: [g for g in gs if g not in marker_genes] for d, gs in pool.items()
+    }
+    gen_disj = rng(29)
+
+    def max_abs_corr_disjoint(gl) -> tuple[float, str] | None:
+        """評価セットとマーカー集合から共有遺伝子を双方除いて、最大絶対相関を返す。"""
+        s_genes = [g for g in gl if g not in marker_genes]
+        s = score(s_genes)
+        if s is None:
+            return None
+        best_v, best_k = None, ""
+        for label, m_genes in marker_members.items():
+            m = score([g for g in m_genes if g not in set(gl)])
+            if m is None:
+                continue
+            v = abs(float(stats.spearmanr(s, m)[0]))
+            if best_v is None or v > best_v:
+                best_v, best_k = v, label
+        return (best_v, best_k) if best_v is not None else None
+
     rows = []
     for _, r in passing.iterrows():
         present = [g for g in genes.get(r["set"], []) if g in Z.index and g in dec.index]
@@ -99,6 +142,24 @@ def _composition_correlation(passing, all_sets, genes, n_control=N_COMP_CONTROL)
         cors = {k: float(stats.spearmanr(s, v)[0]) for k, v in refs.items()}
         best = max(cors, key=lambda k: abs(cors[k]))
         obs = abs(cors[best])
+        # --- disjoint 版 ---
+        n_shared = len(set(present) & marker_genes)
+        dj = max_abs_corr_disjoint(present)
+        if dj is None:
+            dj_obs, dj_ref, dj_null_med, dj_p = float("nan"), "", float("nan"), float("nan")
+        else:
+            dj_obs, dj_ref = dj
+            decs_d = [int(dec[g]) for g in present if g not in marker_genes]
+            dj_null = []
+            for _ in range(n_control):
+                draw = [pool_disj[d][int(gen_disj.integers(len(pool_disj[d])))]
+                        for d in decs_d if pool_disj[d]]
+                v = max_abs_corr_disjoint(draw)
+                if v is not None:
+                    dj_null.append(v[0])
+            dj_null_med = float(np.median(dj_null)) if dj_null else float("nan")
+            dj_p = ((sum(1 for v in dj_null if v >= dj_obs) + 1) / (len(dj_null) + 1)
+                    if dj_null else float("nan"))
         # 同じサイズ・同じ発現量十分位の構成でランダムセットを引き、同じ量を測る
         decs = [int(dec[g]) for g in present]
         null = []
@@ -115,13 +176,20 @@ def _composition_correlation(passing, all_sets, genes, n_control=N_COMP_CONTROL)
                      "対照の最大絶対相関 中央値": round(null_med, 3),
                      "超過": round(obs - null_med, 3),
                      "経験p": round(p_emp, 4),
+                     "マーカーと共有する遺伝子数": n_shared,
+                     "重複除去後の最大絶対相関": round(dj_obs, 3),
+                     "重複除去後の相手": dj_ref,
+                     "重複除去後の対照 中央値": round(dj_null_med, 3),
+                     "重複除去後の超過": round(dj_obs - dj_null_med, 3),
+                     "重複除去後の経験p": round(dj_p, 4),
                      **{f"rho_{k}": round(v, 3) for k, v in cors.items()}})
     out = pd.DataFrame(rows)
     if not out.empty:
-        ok = out["経験p"].notna()
-        out["q"] = np.nan
-        if ok.sum() > 1:
-            out.loc[ok, "q"] = multipletests(out.loc[ok, "経験p"], method="fdr_bh")[1]
+        for src, dst in (("経験p", "q"), ("重複除去後の経験p", "重複除去後のq")):
+            ok = out[src].notna()
+            out[dst] = np.nan
+            if ok.sum() > 1:
+                out.loc[ok, dst] = multipletests(out.loc[ok, src], method="fdr_bh")[1]
     return out
 
 
