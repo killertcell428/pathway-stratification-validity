@@ -152,6 +152,32 @@ def checks() -> list[tuple[str, float, int, bool]]:
     # --- 帰無モデルの感度分析（対照を注釈遺伝子プールから引く）---
     # 対照が「注釈されている遺伝子である」性質を保存していなければ、超過は注釈の質ではなく
     # プールの違いを測っていることになる。判定がどれだけ動くかを登録する。
+    # --- 第 1 主成分の説明率は、サイズ対応対照と比べて初めて読める ---
+    # pc1_frac 自体は遺伝子数に強く依存する（順位相関 -0.807）。ファミリー順を
+    # そのまま並べるとサイズの差を読むことになるので、超過を登録する。
+    _dim = load("dimensionality.csv")
+    add("pc1_frac と遺伝子数の順位相関",
+        float(_dim[["pc1_frac", "n_genes"]].corr(method="spearman").iloc[0, 1]), 3)
+    add("pc1_frac が対照を上回るセットの割合(%)", 100 * _dim.pc1_p_empirical.lt(0.05).mean(), 1)
+    _dg = _dim.groupby("family")
+    for key, lab in (("data_derived", "データ由来モジュール"), ("complex", "CORUM 複合体"),
+                     ("pathway", "反応経路"), ("signature", "発現シグネチャ"),
+                     ("regulon", "転写因子レギュロン"), ("celltype", "細胞種マーカー")):
+        if key in _dg.groups:
+            add(f"[pc1 超過] {lab}", float(_dg.get_group(key).pc1_excess.median()), 3)
+            add(f"[pc1 遺伝子数中央値] {lab}", int(_dg.get_group(key).n_genes.median()), 0,
+                required=False)
+
+    # --- 表現型の 2 時点一致度を、重複をまとめた単位で測り直したもの ---
+    # -0.051 は 2,093 セットを独立扱いした値。代表集合に落としても向きは変わらない。
+    _pa = pd.read_csv(T / "phenotype_agreement_by_unit.csv")
+    for _, r in _pa.iterrows():
+        lab = "全セット" if r["unit"] == "all sets" else r["unit"].replace(
+            "representatives at Jaccard ", "代表集合 Jaccard ")
+        add(f"[表現型一致度] {lab}", float(r["spearman"]), 3, required=False)
+    add("[表現型一致度] 代表集合 Jaccard 0.25 の順位相関",
+        float(_pa[_pa.unit == "representatives at Jaccard 0.25"].spearman.iloc[0]), 3)
+
     # --- 遺伝子セットの重複を考慮した有効単位数 ---
     # 2,195 セットは独立ではない。Jaccard 類似度でまとめた単位で数え直した値を登録する。
     _rd = load("redundancy_analysis.csv").set_index("jaccard_threshold")
@@ -971,7 +997,7 @@ def table_rows() -> list[tuple[str, str, str]]:
         # この対を照合する（差だけを照合していた頃は、重複していた旧ブロックの
         # 「最大 0.008」という言い方に引っ張られていた）。
         ("表 3c と表 3・表 3b の一致数",
-         f"表 3・表 3b と一致するのは {n_tot} 項目のうち {n_ag} 項目で、"
+         f"表 S9・表 S10 と一致するのは {n_tot} 項目のうち {n_ag} 項目で、"
          f"残る {n_tot - n_ag} 項目は対照の引き直しによる差が残る",
          f"It agrees with Tables 3 and 3b for four of the nine entries; "
          f"the other five differ because the controls are redrawn"),

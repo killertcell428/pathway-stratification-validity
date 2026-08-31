@@ -1,0 +1,6 @@
+unit,n,spearman
+all sets,2093,-0.051
+representatives at Jaccard 0.9,1716,-0.062
+representatives at Jaccard 0.75,1543,-0.029
+representatives at Jaccard 0.5,1175,-0.016
+representatives at Jaccard 0.25,764,-0.005

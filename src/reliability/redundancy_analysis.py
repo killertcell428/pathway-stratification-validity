@@ -119,7 +119,35 @@ def main() -> int:
               f" / any {100*any_pass.mean():.1f}%  rep {100*rep_pass.mean():.1f}%"
               f"  redo {100*redo.mean():.1f}%")
 
-    print("[4/4] 書き出す")
+    print("[4/5] 表現型との相関の 2 時点一致度を、代表集合で測り直す")
+    # 3.10 節（補遺 S8）の順位相関 -0.051 は 2,093 セットを独立な単位として扱っている。
+    # セットは遺伝子を共有するので、代表集合に落として同じ相関を測り直す。
+    pheno_rows = []
+    ph_path = TABLES / "phenotype_metrics.csv"
+    if ph_path.exists():
+        ph = pd.read_csv(ph_path).set_index("set")
+        cols = ["abs_rho_z", "abs_rho_z_day-7"]
+        full = ph[cols].dropna()
+        rho_all = float(full.corr(method="spearman").iloc[0, 1])
+        print(f"  全 {len(full):,} セット: 2 時点の順位相関 {rho_all:+.3f}")
+        pheno_rows.append({"unit": "all sets", "n": len(full), "spearman": round(rho_all, 3)})
+        for th in THRESHOLDS:
+            labels = fcluster(Z, t=1.0 - th, criterion="distance")
+            df2 = pd.DataFrame({"cluster": labels, "n_genes": n_genes}, index=names)
+            rep = (df2.assign(d=lambda x: (x.n_genes - x.groupby("cluster").n_genes
+                                           .transform("median")).abs())
+                      .sort_values(["cluster", "d"]).groupby("cluster").head(1).index)
+            sub = ph.reindex([s for s in rep if s in ph.index])[cols].dropna()
+            if len(sub) < 20:
+                continue
+            r = float(sub.corr(method="spearman").iloc[0, 1])
+            print(f"  Jaccard {th}: 代表 {len(sub):,} セット → {r:+.3f}")
+            pheno_rows.append({"unit": f"representatives at Jaccard {th}",
+                               "n": len(sub), "spearman": round(r, 3)})
+        pd.DataFrame(pheno_rows).to_csv(
+            TABLES / "phenotype_agreement_by_unit.csv", index=False, encoding="utf-8")
+
+    print("[5/5] 書き出す")
     out = pd.DataFrame(rows)
     base = 100 * pass_by_name.mean()
     out["set_level_pct"] = base

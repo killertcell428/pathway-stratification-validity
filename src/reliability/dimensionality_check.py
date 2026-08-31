@@ -23,6 +23,14 @@
   (1) と (2) が揃えば、反映型にも形成型にも当てはまらないセットが特定できる。
   そこでは内部整合性を要求することが不当ではなくなる。
 
+  **ただし第 1 主成分の説明率は、それ自体がセットの遺伝子数に強く依存する。**
+  遺伝子が少なければ 1 因子で説明できる割合は自動的に上がる（実測で
+  pc1_frac と遺伝子数の順位相関は −0.807）。したがってファミリー別の
+  pc1_frac の中央値をそのまま並べると、CORUM 複合体（遺伝子数中央値 4）が高く
+  細胞種マーカー（105）が低いという順序が出るが、これはサイズの差を
+  読んでいるにすぎない。そこでサイズと発現量十分位をそろえたランダムセットの
+  pc1_frac も計算し、**超過**で比べる。
+
 限界
   形成型の妥当性は本来、外的な基準との関連（criterion validity）で示す。
   本研究の表現型解析（3.10 節）は n = 42 で検出力が足りないため、
@@ -40,11 +48,12 @@ import sys
 import numpy as np
 import pandas as pd
 
-from ..common import INTERIM, METADATA, TABLES, load_config
+from ..common import INTERIM, METADATA, TABLES, gene_mean_path, load_config, rng
 from ..scoring.methods import _rank_rows, _standardize_rows
 from .run_evaluation import load_all_sets
 
 PC1_THRESHOLD = 0.30    # 反映型解釈の目安。単一因子が 3 割未満なら支配的とは言えない
+N_PC1_CONTROL = 200     # pc1_frac の対照数。SVD を回すので 10,000 は要らない
 
 
 def main() -> int:
@@ -63,6 +72,23 @@ def main() -> int:
     metrics = pd.read_csv(TABLES / "gene_set_metrics.csv")
     sets = load_all_sets(gs_cfg)
 
+    def pc1_of(idx: list[int]) -> float:
+        A = S[idx]
+        A = A - A.mean(axis=1, keepdims=True)
+        sv = np.linalg.svd(A, compute_uv=False)
+        sq = sv ** 2
+        tot = float(sq.sum())
+        return float(sq[0] / tot) if tot > 0 else float("nan")
+
+    # 対照プール: 発現量十分位ごとの行番号
+    gm = pd.read_csv(gene_mean_path(), index_col=0)["mean_expression"]
+    gm = gm.loc[gm.index.intersection(X.index)]
+    dec = pd.qcut(gm, 10, labels=False, duplicates="drop")
+    pool: dict[int, list[int]] = {}
+    for g, dd in dec.items():
+        pool.setdefault(int(dd), []).append(index[g])
+    gen = rng(31)
+
     rows = []
     for name, (family, genes) in sets.items():
         present = [g for g in genes if g in index]
@@ -70,12 +96,22 @@ def main() -> int:
             continue
         if len(present) / len(genes) < filt["min_coverage"] and family != "anchor":
             continue
-        A = S[[index[g] for g in present]]
-        A = A - A.mean(axis=1, keepdims=True)
-        sv = np.linalg.svd(A, compute_uv=False)
-        var_ratio = (sv ** 2) / float((sv ** 2).sum())
+        obs = pc1_of([index[g] for g in present])
+        # サイズと発現量十分位をそろえた対照の pc1_frac
+        decs = [int(dec[g]) for g in present if g in dec.index]
+        null = []
+        if len(decs) >= filt["min_genes"]:
+            for _ in range(N_PC1_CONTROL):
+                draw = [pool[dd][int(gen.integers(len(pool[dd])))] for dd in decs]
+                v = pc1_of(draw)
+                if v == v:
+                    null.append(v)
+        null_med = float(np.median(null)) if null else float("nan")
+        p_emp = ((sum(1 for v in null if v >= obs) + 1) / (len(null) + 1)
+                 if null else float("nan"))
         rows.append({"set": name, "family": family, "n_genes": len(present),
-                     "pc1_frac": float(var_ratio[0])})
+                     "pc1_frac": obs, "pc1_null_median": null_med,
+                     "pc1_excess": obs - null_med, "pc1_p_empirical": p_emp})
     d = pd.DataFrame(rows).merge(
         metrics[["set", "method_agreement_min", "internal_consistency"]],
         on="set", how="left")
@@ -97,7 +133,15 @@ def main() -> int:
           f"{hi.method_agreement_min.median():.3f}")
 
     print("\n=== ファミリー別の一次元性 ===")
-    print(d.groupby("family").pc1_frac.agg(["size", "median"]).round(3).to_string())
+    print(d.groupby("family").agg(
+        n=("set", "size"), n_genes=("n_genes", "median"),
+        pc1=("pc1_frac", "median"), pc1_null=("pc1_null_median", "median"),
+        excess=("pc1_excess", "median")).round(3).to_string())
+    print()
+    print(f"  pc1_frac と遺伝子数の順位相関: "
+          f"{d[['pc1_frac', 'n_genes']].corr(method='spearman').iloc[0, 1]:.3f}")
+    print(f"  対照を上回るセット（経験 p < 0.05）: "
+          f"{100 * d.pc1_p_empirical.lt(0.05).mean():.1f}%")
     print(f"\n-> {TABLES / 'dimensionality.csv'}")
     return 0
 
