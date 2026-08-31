@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -174,6 +175,11 @@ def checks() -> list[tuple[str, float, int, bool]]:
     add("注釈遺伝子プール対照での合格セット数", int(_nm.pass_annot.sum()), 0)
     add("全遺伝子プール対照での合格セット数", int(_nm.pass_all.sum()), 0)
     add("PC1 そろえ対照での合格セット数", int(_nm.pass_pc1.sum()), 0)
+
+    # --- コホートの規模（Methods の表 M1）---
+    # 検証側だけでなく総数も表に出すので、分割ファイルから数えて照合する。
+    _split = json.loads((Path(__file__).resolve().parents[1] / "data" / "metadata" / "donor_split.json").read_text(encoding="utf-8"))
+    add("主コホートの総ドナー数", sum(len(v) for v in _split.values() if isinstance(v, list)), 0)
 
     # --- 引用追跡（語の検索が取りこぼした研究がないかの第 2 経路）---
     # 不在の主張は経路を 1 本しか持たないと弱い。件数を原稿と機械照合する。
@@ -790,7 +796,7 @@ def checks() -> list[tuple[str, float, int, bool]]:
     # （n_genes_present）ではなく注釈の定義から数える。
     # 同名の集合が pathway| 側にもあるので celltype| に限る。
     try:
-        from src.common import load_config as _lc
+        from src.common import METADATA, load_config as _lc
         from src.reliability.run_evaluation import load_all_sets as _las
         _all = _las(_lc("gene_sets"))
         for name in ("Hemangioblasts", "Trophoblast Progenitor Cells", "Reticulocytes",
