@@ -67,9 +67,17 @@ C_COH = SUBTLE         # 共変動のみ
 C_NEITHER = "#d0d0d0"  # どちらもなし
 
 
-def _regions(df: pd.DataFrame) -> dict[str, float]:
-    """4 区画の割合（%）。合計は 100 になる。"""
-    cond = df["delta_q"] < 0.05
+def _regions(df: pd.DataFrame, common_null: bool = True) -> dict[str, float]:
+    """4 区画の割合（%）。合計は 100 になる。
+
+    `common_null=True` では条件効果も**同じ対照への超過**で判定する。
+    ゼロ帰無（delta_q）と対照超過（cond_null_q）を交差させると、2 つの判定が
+    別の帰無を持つため「条件効果のみ」が大きく出る。それは注釈セット固有の
+    乖離の大きさではなく判定基準の非対称性を映すので、本文の図は共通対照で描く。
+    ゼロ帰無版は補遺の図に回す。
+    """
+    col = "cond_null_q" if common_null and "cond_null_q" in df.columns else "delta_q"
+    cond = df[col] < 0.05
     coh = coherence_pass(df)
     return {
         "cond_only": 100 * float((cond & ~coh).mean()),
@@ -174,15 +182,18 @@ def _panel_a(ax) -> None:
 
 def _panel_b(ax, df: pd.DataFrame, reg: dict[str, float]) -> None:
     """主コホートの散布図。旧 Figure 1 を C と同じ 4 区画に整理して吸収する。"""
-    d = df.dropna(subset=["cohens_d", "internal_consistency"])
-    x = d["cohens_d"].abs()
-    y = d["internal_consistency"]
-    cond = d["delta_q"] < 0.05
+    # 両軸を「同じ 10,000 対照に対する超過の q 値」に取る。生の |d| と生の共変動を
+    # 軸にすると、2 つの量が別の帰無で判定されていることが図から見えない。
+    d = df.dropna(subset=["cond_null_q", "null_q", "var_null_q"]).copy()
+    eps = 1e-6
+    d["x"] = -np.log10(d["cond_null_q"].clip(lower=eps))
+    d["y"] = -np.log10(d[["null_q", "var_null_q"]].max(axis=1).clip(lower=eps))
+    x, y = d["x"], d["y"]
+    cond = d["cond_null_q"] < 0.05
     coh = coherence_pass(d)
-
-    ax.axhspan(float(np.nanpercentile(d["null_mean"], 5)),
-               float(np.nanpercentile(d["null_mean"], 95)),
-               color=HAIRLINE, zorder=0)
+    thr = -np.log10(0.05)
+    ax.axvline(thr, color=INK, linewidth=0.9, zorder=1)
+    ax.axhline(thr, color=INK, linewidth=0.9, zorder=1)
     # パネル C と同じ 4 区画に揃える。
     # 以前は「条件効果なし」を 1 色にまとめていたが、C は 4 区画に分けていたので、
     # 同じ図の中で分割が食い違っていた。共変動のみの区画は主コホートで 0.5%
@@ -197,28 +208,29 @@ def _panel_b(ax, df: pd.DataFrame, reg: dict[str, float]) -> None:
                        linewidths=0, label="condition effect + coherence")
 
     # 最大区画の割合を図中に大きく出す。ここが入口図の要点である。
-    ax.text(0.96, 0.97, f"{reg['cond_only']:.1f}%", transform=ax.transAxes,
-            fontsize=18, color=C_ONLY, ha="right", va="top", weight="bold")
-    ax.text(0.96, 0.855, "respond to the stimulus\nbut do not clear the\ncoherence controls",
+    ax.text(0.70, 0.74, f"{reg['neither']:.1f}%", transform=ax.transAxes,
+            fontsize=18, color=MUTED, ha="right", va="top", weight="bold")
+    ax.text(0.70, 0.625, "clear neither set of\nmatched controls",
             transform=ax.transAxes, fontsize=7.2, color=MUTED, ha="right", va="top",
             linespacing=1.45)
 
-    for _, r in df[df["family"] == "anchor"].iterrows():
-        ax.scatter([abs(r["cohens_d"])], [r["internal_consistency"]], s=44,
+    for _, r in d[d["family"] == "anchor"].iterrows():
+        ax.scatter([r["x"]], [r["y"]], s=44,
                    facecolors="none", edgecolors=BLUE, linewidths=1.2, zorder=5)
         ax.annotate(r["set"].split("|")[1].replace("_", " "),
-                    (abs(r["cohens_d"]), r["internal_consistency"]),
+                    (r["x"], r["y"]),
                     textcoords="offset points", xytext=(6, 4), fontsize=6.8,
                     color=BLUE, zorder=6,
                     bbox=dict(boxstyle="round,pad=0.12", facecolor="white",
                               edgecolor="none", alpha=0.85))
 
-    ax.set_xlabel("Condition effect  |Cohen's d|", fontsize=8.8, color=INK)
-    ax.set_ylabel("Individual-level coherence", fontsize=8.8, color=INK)
+    ax.set_xlabel("Condition effect vs matched controls  (−log₁₀ q)", fontsize=8.8, color=INK)
+    ax.set_ylabel("Coherence vs matched controls  (−log₁₀ q)", fontsize=8.8, color=INK)
     # 凡例の並びは C の積み上げ順（下から 条件のみ / 両方 / 共変動のみ / どちらも）に
     # そろえる。描画順は重なりの都合で別なので、ここで並べ替える。
     ax.legend(handles=[h_con, h_bot, h_coh, h_nei],
-              frameon=False, fontsize=6.8, loc="lower right", handletextpad=0.3,
+              frameon=True, facecolor="white", edgecolor=HAIRLINE, framealpha=0.92,
+              fontsize=6.6, loc="upper left", handletextpad=0.3,
               borderpad=0.15, labelspacing=0.25, markerscale=1.8)
     _style(ax)
 
@@ -244,7 +256,7 @@ def _panel_c(ax, regs: list[tuple[str, dict[str, float]]]) -> None:
             if v >= 7:
                 ax.text(xx, bottom + v / 2, f"{v:.1f}%", ha="center", va="center",
                         fontsize=8.2,
-                        weight="bold" if key == "cond_only" else "normal",
+                        weight="bold" if key == "neither" else "normal",
                         color="white" if col in (C_ONLY, C_BOTH) else INK)
             else:
                 outside.append((bottom + v / 2, v, col))
@@ -305,7 +317,7 @@ def build(cfg: dict) -> None:
                 weight="bold", va="bottom", ha="left")
 
     fig.text(0.010, 0.988,
-             "Condition responsiveness does not imply individual-level measurability",
+             "Against matched controls, most gene sets clear neither requirement",
              fontsize=10.4, color=INK, va="top", weight="bold")
 
     _save(fig, "fig1_overview", cfg, laid_out=True)

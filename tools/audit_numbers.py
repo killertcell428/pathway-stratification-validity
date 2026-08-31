@@ -941,13 +941,12 @@ def table_rows() -> list[tuple[str, str, str]]:
     rc = _regions(load("gse81046/gene_set_metrics.csv"))
 
     def _reg_ja(r: dict) -> str:
-        return (f"条件効果のみ {r['cond_only']:.1f}%、両方 {r['both']:.1f}%、"
-                f"共変動のみ {r['coh_only']:.1f}%、どちらもなし {r['neither']:.1f}%")
+        return (f"どちらも通らない {r['neither']:.1f}%、条件効果のみ {r['cond_only']:.1f}%、"
+                f"共変動のみ {r['coh_only']:.1f}%、両方 {r['both']:.1f}%")
 
     def _reg_en(r: dict) -> str:
-        return (f"condition effect only {r['cond_only']:.1f}%, "
-                f"both {r['both']:.1f}%, coherence only {r['coh_only']:.1f}%, "
-                f"neither {r['neither']:.1f}%")
+        return (f"neither {r['neither']:.1f}%, condition effect only {r['cond_only']:.1f}%, "
+                f"coherence only {r['coh_only']:.1f}%, both {r['both']:.1f}%")
 
     # 表 3c の一元配置列が表 3・表 3b と何項目一致するか。原稿の主張を数え直す。
     PAPER_3C = {
