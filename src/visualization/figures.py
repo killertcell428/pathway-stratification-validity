@@ -335,7 +335,7 @@ def fig4_qualification_map(df: pd.DataFrame, cfg: dict) -> None:
     fig.text(0.012, 0.965, "Qualification map for individual stratification",
              fontsize=11, color=INK, va="top")
     _style(ax)
-    _save(fig, "fig4_qualification_map", cfg, top=0.93,
+    _save(fig, "figS2_descriptive_map", cfg, top=0.93,
           footnote="The vertical axis is the BH-FDR q-value from the empirical p-values "
               "against 10,000 matched random sets, taken as the weaker of the two controls "
               f"and plotted as −log₁₀. The horizontal line is therefore the qualification "
@@ -394,7 +394,7 @@ def fig6_retest(cfg: dict) -> None:
     ax.legend(frameon=False, fontsize=9, loc="lower right")  # 左上は注釈と重なる
     _style(ax)
     ax.grid(axis="x", color=HAIRLINE, linewidth=0.8)
-    _save(fig, "fig6_retest_nonspecific", cfg, top=0.93,
+    _save(fig, "fig5_retest_nonspecific", cfg, top=0.93,
           footnote=f"n = {len(d)} gene sets, 56 donors, PBMC (GSE47353). Dashed line: annotated = random. "
               "Points on the line have reliability that any random gene set of the same size "
               "reproduces.")
@@ -451,7 +451,7 @@ def fig7_phenotype_rerandomized(cfg: dict) -> None:
     ax.legend(frameon=False, fontsize=9, loc="lower left")
     _style(ax)
     ax.grid(axis="x", color=HAIRLINE, linewidth=0.8)
-    _save(fig, "fig7_phenotype_rerandomized", cfg, top=0.93,
+    _save(fig, "figS1_phenotype_rerandomized", cfg, top=0.93,
           footnote="Both draws are pre-vaccination. n = 42 donors with a known response class, "
               f"{len(d)} gene sets. Sets above z = 2 beat their own size- and "
               "expression-matched controls.")
@@ -586,7 +586,7 @@ def fig5_cross_cohort_attribution(cfg: dict) -> None:
                loc="upper center", bbox_to_anchor=(0.5, bottom - 0.012))
     fig.text(0.012, bottom - 0.055, footnote, fontsize=8, color=SUBTLE,
              va="top", linespacing=1.5)
-    _save(fig, "fig5_cross_cohort_attribution", cfg, laid_out=True)
+    _save(fig, "fig4_cross_cohort_attribution", cfg, laid_out=True)
 
 
 def main() -> int:
