@@ -11,8 +11,8 @@ abstract: >-
   controls, and the sensitivity analyses that vary the null model, the definition of
   coherence, the redundancy of the sets and the preprocessing.
 type: software
-version: 0.1.0  # TODO タグ付け時に 1.0.0 へ更新（docs/計画と運用/18 のステップ 1）
-date-released: "2026-08-03"  # TODO タグ付け時に当日の日付へ更新（同上）
+version: 1.0.0
+date-released: "2026-08-31"
 license: MIT
 repository-code: "https://github.com/cytraUeda/pathway-stratification-validity"
 url: "https://github.com/cytraUeda/pathway-stratification-validity"
