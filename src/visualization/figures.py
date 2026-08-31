@@ -602,7 +602,8 @@ def main() -> int:
     build_fig1_overview(cfg)     # 本文の図 1（4 パネルの入口図）
     fig2_by_family(df, cfg)
     fig3_method_agreement(df, cfg)
-    fig4_qualification_map(df, cfg)
+    # 適格性マップは図 1 が共通対照で同じ 2 軸を描くため原稿から外した。
+    # 帰無が非対称な図を併置すると読者を混乱させるので生成もしない。
     fig6_retest(cfg)
     fig7_phenotype_rerandomized(cfg)
     fig5_cross_cohort_attribution(cfg)
