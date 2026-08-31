@@ -159,6 +159,7 @@ def checks() -> list[tuple[str, float, int, bool]]:
         add(f"[Jaccard {th}] クラスタ数", int(r.n_clusters), 0)
         add(f"[Jaccard {th}] クラスタ単位の合格率(%) any", float(r.pass_any_pct), 1)
         add(f"[Jaccard {th}] クラスタ単位の合格率(%) rep", float(r.pass_rep_pct), 1)
+        add(f"[Jaccard {th}] 代表集合で BH を引き直した合格率(%)", float(r.pass_redo_pct), 1)
 
     _nm = load("null_model_sensitivity.csv")
     add("注釈遺伝子プール対照での合格率(%)", 100 * _nm.pass_annot.mean(), 1)

@@ -17,6 +17,16 @@
 
   この 2 つが主解析の値をはさむなら、重複は割合の水準を作っていないと言える。
 
+  **ただし any と rep はどちらも、2,195 件で計算した BH の合否をそのまま流用している。**
+  any はクラスタが大きいほど当たりを引きやすく、rep は代表の合否が 2,195 件を分母にした
+  多重比較補正に依存する。どちらも「単位を数え直したときの合格率」としては不正確である。
+
+    redo : 代表 1 件だけを残し、**その部分集合で経験 p 値から BH を計算し直す**（正しい側）
+
+  redo は検定の数がクラスタ数まで減るので補正が緩くなり、合格率は上がりうる。
+  上がっても「重複が合格の少なさを作っていた」ことにはならない。逆に、緩めても
+  合格率が主解析と同水準にとどまるなら、その結論は重複の産物ではないと言える。
+
 使い方:
   pixi run redundancy
 """
@@ -26,6 +36,8 @@ import numpy as np
 import pandas as pd
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
+
+from statsmodels.stats.multitest import multipletests
 
 from ..common import TABLES, load_config
 from .run_evaluation import load_all_sets
@@ -82,6 +94,17 @@ def main() -> int:
                                           .transform("median")).abs())
                      .sort_values(["cluster", "d"]).groupby("cluster").head(1).index)
         rep_pass = df.loc[rep_idx].groupby("cluster").passed.first()
+        # 代表だけを残して、その部分集合で BH をかけ直す。
+        # 検定数が減るので閾値が緩む。合格率が上がってもそれは補正の緩みであって、
+        # 重複が合格を抑えていた証拠ではない。
+        rep_names = [names[i] for i in rep_idx]
+        sub = evaluated.loc[rep_names]
+        redo = pd.Series(False, index=rep_names)
+        ok = sub.null_p_empirical.notna() & sub.var_null_p_empirical.notna()
+        if ok.sum() > 1:
+            q1 = multipletests(sub.loc[ok, "null_p_empirical"], method="fdr_bh")[1]
+            q2 = multipletests(sub.loc[ok, "var_null_p_empirical"], method="fdr_bh")[1]
+            redo.loc[ok[ok].index] = (q1 < 0.05) & (q2 < 0.05)
         rows.append({
             "jaccard_threshold": th,
             "n_clusters": n_cluster,
@@ -89,10 +112,12 @@ def main() -> int:
             "reduction_pct": 100 * (1 - n_cluster / len(names)),
             "pass_any_pct": 100 * any_pass.mean(),
             "pass_rep_pct": 100 * rep_pass.mean(),
+            "pass_redo_pct": 100 * redo.mean(),
         })
         print(f"  Jaccard {th}: {n_cluster:,} クラスタ"
               f"（{100*(1-n_cluster/len(names)):.1f}% 削減）"
-              f" / any {100*any_pass.mean():.1f}%  rep {100*rep_pass.mean():.1f}%")
+              f" / any {100*any_pass.mean():.1f}%  rep {100*rep_pass.mean():.1f}%"
+              f"  redo {100*redo.mean():.1f}%")
 
     print("[4/4] 書き出す")
     out = pd.DataFrame(rows)
