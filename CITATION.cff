@@ -14,8 +14,8 @@ type: software
 version: 1.0.0
 date-released: "2026-08-31"
 license: MIT
-repository-code: "https://github.com/cytraUeda/pathway-stratification-validity"
-url: "https://github.com/cytraUeda/pathway-stratification-validity"
+repository-code: "https://github.com/killertcell428/pathway-stratification-validity"
+url: "https://github.com/killertcell428/pathway-stratification-validity"
 authors:
   - given-names: "Ryota"
     family-names: "Ueda"
