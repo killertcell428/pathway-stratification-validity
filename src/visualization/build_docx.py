@@ -33,7 +33,7 @@ BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 IMG_RE = re.compile(r"^!\[(?P<cap>.*?)\]\((?P<path>[^)]+)\)\s*$")
 # Letter・余白 1 インチの本文幅。figures.py の DOC_WIDTH_IN と一致させる。
 # 図の保存幅がこれより大きいと、その分だけ縮小されて図中の文字が読めなくなる。
-IMG_WIDTH_IN = 6.5
+IMG_WIDTH_IN = 6.0   # 本文幅（8.5 - 左右余白 1.25 x 2）に収める。はみ出すと変換系が落ちる
 
 
 def _set_font(run, size: float, bold: bool = False, color: str | None = None) -> None:
