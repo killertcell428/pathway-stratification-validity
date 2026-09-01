@@ -26,6 +26,7 @@ openpyxl = "*"
 [pypi-dependencies]
 # 査読用の Word 原稿を生成する（原稿の原本は manuscript/*.md、docx はそこから作る）
 python-docx = "*"
+pypdf = "*"          # 投稿前に PDF の用紙・暗号化・図の有無を確かめる（tools/submit_check.py）
 # AI 検出器（GPTZero 等）が返す PDF から、ハイライト注釈の色と対象テキストを取り出す。
 # 投稿前に検出器を再実行するため、使い捨てにせずここに置く。
 pymupdf = "*"
@@ -38,7 +39,7 @@ rdata = "*"
 gseapy = ">=1.3.1, <2"
 
 [tasks]
-check = "python -c \"import pandas, numpy, scipy, statsmodels, sklearn, pyarrow; print('imports OK')\""
+check-imports = "python -c \"import pandas, numpy, scipy, statsmodels, sklearn, pyarrow; print('imports OK')\""
 download = { cmd = "python -m src.download.fetch_datasets && python -m src.download.fetch_gene_sets", description = "公開データと遺伝子セットを取得し sha256 を記録する" }
 preprocess = { cmd = "python -m src.preprocessing.build_matrices", description = "条件別の gene x individual 行列を作る" }
 modules = { cmd = "python -m src.preprocessing.derive_modules", description = "探索側の個人からデータ由来共発現モジュールを作る" }
@@ -98,4 +99,15 @@ qc-tables = { cmd = "python -m tools.qc_tables", description = "表と図の数�
 prepub-scan = { cmd = "python -m tools.prepublication_scan", description = "公開履歴に入れてはいけないものが混ざっていないかを調べる（public 化と push の前に必ず通す）" }
 variance-decomposition = { cmd = "python -m src.reliability.variance_decomposition", description = "主成分の説明分散を要因群の固有分と共有分に分ける（commonality / Shapley、4 コホート）" }
 review-r2 = { cmd = "python tools/_review/build_r2.py", description = "変更点レビュー資料（2026-08-19 第2版）を HTML と Markdown で再生成する" }
+
+# --- 原稿の検査（数値は audit / qc-tables、構造は lint、主張は claim-scan）---
+lint = { cmd = "python -m tools.manuscript_lint", description = "図表番号・参照の実在・補遺の順序と重複・要旨語数・引用の連続性を検査する" }
+claim-scan = { cmd = "python -m tools.claim_scan", description = "データより強い主張になりやすい語句を全部拾う（判定は skill claim-discipline で行う）" }
+submit-files = { cmd = "python -m tools.submit_check", description = "docx/PDF の用紙・画像幅・図表の有無・暗号化・md との新旧を検査する" }
+
+# --- 3 段のゲート。左から順に重くなる。docs/計画と運用/21 を参照 ---
+check = { depends-on = ["audit", "qc-tables", "lint"], description = "毎回通す: 数値の照合と構造の検査" }
+review-ready = { depends-on = ["check", "test", "claim-scan"], description = "レビューに出す前: check + テスト + 主張語句の洗い出し" }
+submit-check = { depends-on = ["review-ready", "prepub-scan", "submit-files"], description = "投稿する前: review-ready + 公開してよいかの確認 + 投稿物そのものの検査" }
+
 all = { depends-on = ["download", "preprocess", "modules", "validation", "analyze", "attribution", "batch", "retest", "phenotype", "technical", "figures", "concept"] }

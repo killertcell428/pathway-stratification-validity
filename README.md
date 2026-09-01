@@ -8,7 +8,7 @@
 
 > **予備知識なしで読める解説**: [`docs/public/04-ここまでの成果_やさしい解説.html`](docs/public/04-ここまでの成果_やさしい解説.html)（高校生物までを前提、用語の対応表つき）
 >
-> 状態: プレプリント投稿準備中。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
+> 状態: bioRxiv 投稿済み（2026-09-01、スクリーニング中）。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
 
 ## 予備結果（2,195 遺伝子セット × 207 名の検証個人）
 
@@ -155,6 +155,16 @@ pixi run concept      # コンセプトペーパー(HTML 1 ファイル)を生�
 ```
 
 `pixi run all` で download から concept まで通す。
+
+原稿を触ったときは 3 段のゲートを通す。左から順に重くなり、上の段は下の段を含む。
+
+```bash
+pixi run check         # 原稿を触るたびに: 数値の照合(audit / qc-tables) + 構造の検査(lint)
+pixi run review-ready  # レビューに出す前に: check + テスト + 主張語句の洗い出し(claim-scan)
+pixi run submit-check  # 投稿する前に: review-ready + prepub-scan + 投稿物の検査(submit-files)
+```
+
+`lint` は数値を見ない。図表番号の連番、参照先の実在、補遺の順序と重複、要旨の語数、引用の連続性という構造だけを見る。`claim-scan` は主張が結果より強くなりやすい語句を拾うだけで、判定はしない。検査の中身は各スクリプトの先頭の docstring に書いてある。
 
 ## データ
 
