@@ -10,6 +10,7 @@
   ここで先に落とす。
 
 見るもの
+  投稿先が著者を受け付けるか  所属要件・endorsement・既出可否（今回落ちたのはここ）
   用紙サイズと向き        bioRxiv は 8.5 x 11 inch の portrait を要求する
   画像が本文幅に収まるか   はみ出すと変換系が落ちる
   画像・表が入っているか   図表が抜けた docx を出すと投稿が差し戻される
@@ -22,6 +23,7 @@
 """
 from __future__ import annotations
 
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -44,6 +46,75 @@ TARGETS = [
      MANUSCRIPTS / "02-投稿原稿_日本語_v1.docx",
      None),
 ]
+
+
+# 投稿先ごとの受理条件。**一次情報で確認した日付を必ず添える。**
+# 2026-09-01 の bioRxiv 拒否は、ここを確認せずに投稿したために起きた。
+# 「原稿と投稿物の形」が整っていても、投稿先が著者を受け付けないなら落ちる。
+VENUE = "osf"   # 投稿先を変えたらここを変える
+
+VENUE_RULES = {
+    "biorxiv": {
+        "label": "bioRxiv",
+        "requires_org_affiliation": True,
+        "allows_prior_preprint": False,
+        "verified": "2026-09-02",
+        "why": ("組織による oversight を要求する（研究不正の申し立て先が必要）。"
+                "2026-09-01 に Affiliation = Independent Researcher で拒否された。"
+                "他のプレプリントサーバに既出の原稿も受け付けない"),
+    },
+    "osf": {
+        "label": "OSF Preprints",
+        "requires_org_affiliation": False,
+        "allows_prior_preprint": True,
+        "verified": "2026-09-02",
+        "why": "所属は任意（OSF Support で確認）。DOI と永続 URL が付く。PDF 推奨",
+    },
+    "arxiv": {
+        "label": "arXiv",
+        "requires_org_affiliation": False,
+        "allows_prior_preprint": True,
+        "needs_endorsement": True,
+        "verified": "2026-09-02",
+        "why": ("所属は不要だが、分野への初投稿には既存 arXiv 著者からの endorsement が要る。"
+                "2026-01-21 に方針が厳格化し、所属メールは資格として認められなくなった"),
+    },
+}
+
+# 組織による oversight を提供しない所属の書き方。ここに該当すると bioRxiv 系は落ちる。
+NO_ORG_AFFILIATION = ("independent researcher", "independent scholar",
+                      "unaffiliated", "no affiliation", "private researcher")
+
+
+def check_eligibility(md: Path, venue: str) -> tuple[list[str], list[str]]:
+    """投稿先が著者を受け付けるか。原稿の形ではなく投稿資格を見る。"""
+    errors, notes = [], []
+    rule = VENUE_RULES.get(venue)
+    if rule is None:
+        return [f"投稿先 {venue!r} の受理条件が未登録。一次情報で確認して VENUE_RULES に足す"], []
+    notes.append(f"投稿先 {rule['label']}（受理条件の確認日 {rule['verified']}）")
+    if not md.exists():
+        return errors, notes
+
+    text = md.read_text(encoding="utf-8-sig")
+    m = re.search(r"^\*\*Affiliation\*\*\s*(.+)$", text, re.M)
+    if m is None:
+        m = re.search(r"^\*\*所属\*\*\s*(.+)$", text, re.M)
+    if m is None:
+        errors.append("原稿に Affiliation 行がない")
+        return errors, notes
+    aff = m.group(1).strip()
+    notes.append(f"Affiliation: {aff}")
+
+    if rule["requires_org_affiliation"] and any(k in aff.lower() for k in NO_ORG_AFFILIATION):
+        errors.append(f"{rule['label']} は組織の所属を要求するが、Affiliation が "
+                      f"「{aff}」になっている → {rule['why']}")
+    if rule.get("needs_endorsement"):
+        notes.append(f"注意: {rule['label']} は endorsement が要る。投稿前に取得しておく")
+    if not rule["allows_prior_preprint"]:
+        notes.append(f"注意: {rule['label']} は他サーバに既出の原稿を受け付けない。"
+                     "先に別サーバへ出していないか確認する")
+    return errors, notes
 
 
 def check_freshness(md: Path, docx: Path, pdf: Path | None) -> list[str]:
@@ -152,12 +223,13 @@ def main() -> int:
     total = 0
     for label, md, docx, pdf in TARGETS:
         print(f"=== 投稿物の検査: {label} ===")
+        ev, nv = check_eligibility(md, VENUE)
         e0 = check_freshness(md, docx, pdf)
         e1, n1 = check_docx(docx)
         e2, n2 = check_pdf(pdf)
-        for n in n1 + n2:
+        for n in nv + n1 + n2:
             print(f"  - {n}")
-        errs = e0 + e1 + e2
+        errs = ev + e0 + e1 + e2
         if errs:
             total += len(errs)
             print(f"\n  【要修正 {len(errs)} 件】")
