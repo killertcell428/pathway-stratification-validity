@@ -51,7 +51,7 @@ TARGETS = [
 # 投稿先ごとの受理条件。**一次情報で確認した日付を必ず添える。**
 # 2026-09-01 の bioRxiv 拒否は、ここを確認せずに投稿したために起きた。
 # 「原稿と投稿物の形」が整っていても、投稿先が著者を受け付けないなら落ちる。
-VENUE = "osf"   # 投稿先を変えたらここを変える
+VENUE = "zenodo"   # 投稿先を変えたらここを変える（2026-09-06: preprints_org 却下 → zenodo）
 
 VENUE_RULES = {
     "biorxiv": {
@@ -59,16 +59,42 @@ VENUE_RULES = {
         "requires_org_affiliation": True,
         "allows_prior_preprint": False,
         "verified": "2026-09-02",
-        "why": ("組織による oversight を要求する（研究不正の申し立て先が必要）。"
-                "2026-09-01 に Affiliation = Independent Researcher で拒否された。"
-                "他のプレプリントサーバに既出の原稿も受け付けない"),
+        "requires_research_institution": True,
+        "why": ("**2026-09-02 に確定的に不可と回答された。**要件は単なる組織所属ではなく "
+                "'an established research institution/organization that can provide ethical "
+                "oversight' で、企業（AI コンサル）の所属では満たさない。"
+                "bioRxiv 曰く 'This is an evolving policy landscape'＝最近厳格化した。"
+                "同じ運営の medRxiv も同様と見るべき。他サーバ既出の原稿も受け付けない"),
     },
     "osf": {
         "label": "OSF Preprints",
         "requires_org_affiliation": False,
         "allows_prior_preprint": True,
         "verified": "2026-09-02",
-        "why": "所属は任意（OSF Support で確認）。DOI と永続 URL が付く。PDF 推奨",
+        "accepts_new_submissions": False,
+        "why": ("**generalist server は 2025-08-25 に新規投稿を停止し無期限に継続中。**"
+                "残る 13 のコミュニティサーバに生命科学系はない"
+                "（MetaArXiv は metascience だが BITSS 運営で subject に生物学なし）"),
+    },
+    "preprints_org": {
+        "label": "Preprints.org (MDPI)",
+        "requires_org_affiliation": False,
+        "allows_prior_preprint": True,
+        "file_formats": ("docx", "tex"),
+        "verified": "2026-09-02",
+        "declined": "2026-09-03",
+        "why": ("**2026-09-03 に却下された（Preprints ID 231496）。理由は通知されず、"
+                "問い合わせ未送信。**審査 6 項目のうち疑わしいのは 2 つで、"
+                "(a) 生成 AI 使用の開示が『全セクションの散文を LLM が起草』と明記しており、"
+                "手元の GPTZero も AI 生成確率 65% を返していた、"
+                "(b) 投稿アカウントが個人のフリーメールで、"
+                "原稿の所属 Cytra Inc. と連絡先 ryota.ueda@cytra.jp を裏づけない"
+                "（審査項目に All authors are genuine scholars がある）。"
+                "以下は却下前に確認した受理条件: "
+                "スコープに Biology and Life Sciences を明記。組織所属の要求はなく、"
+                "first page に affiliations を載せるだけ。所属メールは 'where possible' で推奨止まり。"
+                "無料・DOI 発行・スクリーニング約 24 時間・negative results 歓迎と明記。"
+                "**投稿は Word か LaTeX（PDF 不可）**。多重投稿は非推奨"),
     },
     "arxiv": {
         "label": "arXiv",
@@ -76,8 +102,28 @@ VENUE_RULES = {
         "allows_prior_preprint": True,
         "needs_endorsement": True,
         "verified": "2026-09-02",
+        "prior_preprint_basis": "inference",
         "why": ("所属は不要だが、分野への初投稿には既存 arXiv 著者からの endorsement が要る。"
-                "2026-01-21 に方針が厳格化し、所属メールは資格として認められなくなった"),
+                "2026-01-21 に方針が厳格化し、所属メールは資格として認められなくなった。"
+                "**既出可否は明示規定がない（2026-09-04 確認）。**モデレーション方針が扱う重複は "
+                "arXiv 内部のみで、外部リポジトリへの先行公開には触れていない。"
+                "postprint（査読誌に掲載済みの論文）の投稿を認めているので、"
+                "Zenodo 先行公開が障害になる理由はないと判断した。"
+                "ただしこれは禁止規定の不在からの推論であり、明示的許可ではない"),
+    },
+    "zenodo": {
+        "label": "Zenodo",
+        "requires_org_affiliation": False,
+        "allows_prior_preprint": True,
+        "needs_endorsement": False,
+        "verified": "2026-09-04",
+        "file_formats": ("pdf",),
+        "why": ("スクリーニングなし。Resource type に Preprint がある。DOI は即時発行、"
+                "concept DOI と version DOI の 2 本立て。CC-BY 4.0 選択可。"
+                "**本リポジトリのコードは 2026-09-01 に GitHub 連携で別途アーカイブ済み"
+                "（concept 10.5281/zenodo.22222213）。**manuscript/ は .gitignore 対象なので"
+                "そのアーカイブに原稿は入っておらず、原稿は手動デポジットで別レコードにする。"
+                "両者は related identifiers（is supplemented by）で相互に結ぶ"),
     },
 }
 
@@ -106,9 +152,15 @@ def check_eligibility(md: Path, venue: str) -> tuple[list[str], list[str]]:
     aff = m.group(1).strip()
     notes.append(f"Affiliation: {aff}")
 
+    if rule.get("accepts_new_submissions") is False:
+        errors.append(f"{rule['label']} は新規投稿を受け付けていない → {rule['why']}")
+    if rule.get("requires_research_institution"):
+        errors.append(f"{rule['label']} は研究機関の所属を要求する → {rule['why']}")
     if rule["requires_org_affiliation"] and any(k in aff.lower() for k in NO_ORG_AFFILIATION):
         errors.append(f"{rule['label']} は組織の所属を要求するが、Affiliation が "
                       f"「{aff}」になっている → {rule['why']}")
+    if rule.get("file_formats"):
+        notes.append(f"注意: {rule['label']} の投稿形式は {' / '.join(rule['file_formats'])}")
     if rule.get("needs_endorsement"):
         notes.append(f"注意: {rule['label']} は endorsement が要る。投稿前に取得しておく")
     if not rule["allows_prior_preprint"]:

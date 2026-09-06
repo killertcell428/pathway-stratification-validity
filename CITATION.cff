@@ -20,7 +20,7 @@ authors:
   - given-names: "Ryota"
     family-names: "Ueda"
     orcid: "https://orcid.org/0009-0004-7269-4424"
-    affiliation: "Independent Researcher, Japan"
+    affiliation: "Cytra Inc., Tokyo, Japan"
 keywords:
   - gene set scoring
   - single-sample scoring
@@ -30,6 +30,21 @@ keywords:
   - negative controls
   - reproducibility
   - transcriptomics
+preferred-citation:
+  type: article
+  title: "Many annotation-derived gene-set scores show little evidence of gene-set-specific coherence for reflective individual-level interpretation"
+  authors:
+    - given-names: "Ryota"
+      family-names: "Ueda"
+      orcid: "https://orcid.org/0009-0004-7269-4424"
+      affiliation: "Cytra Inc., Tokyo, Japan"
+  year: 2026
+  month: 9
+  doi: 10.5281/zenodo.22505179
+  url: "https://doi.org/10.5281/zenodo.22505179"
+  notes: >-
+    Preprint deposited on Zenodo (version DOI). The concept DOI
+    10.5281/zenodo.22505178 always resolves to the latest version.
 references:
   # 解析に使った公開コホート。取得元と sha256 は data/checksums/provenance.jsonl にある。
   - type: article
