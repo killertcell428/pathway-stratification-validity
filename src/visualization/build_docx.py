@@ -62,8 +62,34 @@ def _add_rich(paragraph, text: str, size: float = 10.5) -> None:
         _set_font(paragraph.add_run(text[pos:]), size)
 
 
+# セルの区切りは「直前が \ でないパイプ」だけ。表の中で | を literal に書くには
+# markdown の作法どおり \| と書く必要があり、そこで分割すると行が壊れて値が消える。
+CELL_SPLIT = re.compile(r"(?<!\\)\|")
+
+
+def _join_wrapped(parts: list[str]) -> str:
+    """ハードラップされた段落を 1 行に戻す。
+
+    markdown では行の折り返しは空白 1 つと同じ意味だが、和文で空白を挟むと
+    文字の間に隙間が空く。両側が ASCII の語のときだけ空白を入れる。
+    """
+    out = parts[0] if parts else ""
+    for nxt in parts[1:]:
+        if not nxt:
+            continue
+        a, b = out[-1:], nxt[:1]
+        need = bool(a) and a.isascii() and not a.isspace() and b.isascii() and not b.isspace()
+        out += (" " if need else "") + nxt
+    return out
+
+
 def _split_row(line: str) -> list[str]:
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    parts = CELL_SPLIT.split(line.strip())
+    if parts and not parts[0].strip():
+        parts = parts[1:]
+    if parts and not parts[-1].strip():
+        parts = parts[:-1]
+    return [c.strip().replace("\\|", "|") for c in parts]
 
 
 def convert(md_path: Path, out_path: Path) -> None:
@@ -102,7 +128,9 @@ def convert(md_path: Path, out_path: Path) -> None:
             continue
 
         # 表: ヘッダ行 + 区切り行 + データ行
-        if line.startswith("|") and i + 1 < len(lines) and re.match(r"^\|[\s:\-|]+\|$", lines[i + 1].strip()):
+        # リスト項目の中に置かれた表は行頭が空白で始まる。列 0 に限定すると
+        # 生の markdown が 1 段落として残り、表が丸ごと読めなくなる。
+        if line.lstrip().startswith("|") and i + 1 < len(lines)                 and re.match(r"^\s*\|[\s:\-|]+\|\s*$", lines[i + 1]):
             header = _split_row(line)
             rows = []
             j = i + 2
@@ -149,22 +177,31 @@ def convert(md_path: Path, out_path: Path) -> None:
             _add_rich(p, m.group(2))
             i += 1
             continue
-        m = re.match(r"^(\s*)\d+\.\s+(.*)$", line)
+        m = re.match(r"^(\s*)(\d+)\.\s+(.*)$", line)
         if m:
-            p = doc.add_paragraph(style="List Number")
-            _add_rich(p, m.group(2))
+            # style="List Number" は Word 側で採番するため、リストが表や段落で
+            # 中断されると番号が前のリストから continue して 3,4,5,6 になる。
+            # 事前登録のような文書では原本の番号がそのまま出ることが要件なので、
+            # 番号を本文として書き出す。
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Inches(0.25 + 0.25 * (len(m.group(1)) // 2))
+            p.paragraph_format.space_after = Pt(4)
+            _add_rich(p, f"{m.group(2)}. {m.group(3)}")
             i += 1
             continue
 
         # 段落（連続行は 1 段落にまとめる）
         buf = [line]
         j = i + 1
-        while j < len(lines) and lines[j].strip() and not re.match(r"^(#{1,4}\s|[-*]\s|\d+\.\s|\|)", lines[j]) and lines[j].strip() != "---":
+        while j < len(lines) and lines[j].strip() and not re.match(r"^\s*(#{1,4}\s|[-*]\s|\d+\.\s|\|)", lines[j]) and lines[j].strip() != "---":
             buf.append(lines[j].strip())
             j += 1
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(6)
-        _add_rich(p, "".join(buf))
+        # 継続行の連結。行末と次行頭がどちらも ASCII の語なら空白を入れる。
+        # 空白なしで連結すると "on the" + "record" が "therecord" になり、
+        # 逆に和文へ一律に空白を入れると文字の間に隙間が空く。境界を見て決める。
+        _add_rich(p, _join_wrapped(buf))
         i = j
 
     doc.save(out_path)

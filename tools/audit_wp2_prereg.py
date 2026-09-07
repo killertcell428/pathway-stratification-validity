@@ -47,6 +47,10 @@ def checks() -> list[tuple[str, str]]:
     # --- 被覆率と除外（TCGA 側）---
     cov = pd.read_csv(T / "wp2_tcga_coverage.csv")
     t = cov[cov.family == "乳がん予後"]
+    # META-PCNA は既発表の予後シグネチャでなく、この研究が目的変数に使う増殖参照
+    # そのもの（prolif.metagene と 129/129 一致）。フレームに残すと目的変数が構成上
+    # 1.000 になるため事前登録で除外している。監査も同じフレームで見る。
+    t = t[t.signature != "META-PCNA"]
     n_main, n_sens = int(t["主解析"].sum()), int(t["感度分析"].sum())
     out.append(("TCGA 主解析の件数", str(n_main)))
     out.append(("感度分析（3-200 遺伝子）の件数", str(n_sens)))
@@ -78,6 +82,8 @@ def checks() -> list[tuple[str, str]]:
 
     # --- 主要目的変数の分布 ---
     v = venet()
+    # フレームから増殖参照を外す（事前登録と同じ 47 シグネチャで見る）。
+    v = v[v.signature != "META-PCNA"]
     v["abs_cor"] = v.pcna_cor.abs()
     for coh, label in (("Loi RFS", "Loi"), ("NKI RFS", "NKI")):
         g = v[v.cohort == coh]
@@ -90,12 +96,29 @@ def checks() -> list[tuple[str, str]]:
     rho = both["Loi RFS"].corr(both["NKI RFS"], method="spearman")
     out.append(("|増殖軸相関| の Loi vs NKI 再現性", f"{rho:.3f}"))
 
+    # --- 目的変数の候補ごとの再現性（事前登録が添付を約束している表）---
+    rep = pd.read_csv(T / "wp2_target_reproducibility.csv")
+    for _, r in rep.iterrows():
+        label = str(r["quantity"])
+        for a, b in (("Loi OS", "Loi RFS"), ("Loi OS", "NKI RFS"), ("Loi RFS", "NKI RFS")):
+            col = f"{a} vs {b}"
+            if col in rep.columns and pd.notna(r[col]):
+                out.append((f"再現性 {label} / {col}", f"{float(r[col]):.3f}"))
+
     # --- 検出力（n は CSV から取り、検出力はここで計算する）---
-    inter = set(t[t["主解析"]].signature) & set(v[v.cohort == "Loi RFS"].signature) \
-        & set(v[v.cohort == "NKI RFS"].signature)
+    inter = (set(t[t["主解析"]].signature)
+             & set(v[v.cohort == "Loi RFS"].signature)
+             & set(v[v.cohort == "NKI RFS"].signature))
     n_eff = len(inter)
+    # 感度分析 a の n は「TCGA 側の件数」ではなく、主解析と同じ 3 コホート共通で数える。
+    # 検出力はその n で決まるため、TCGA 側の件数を使うと過大になる。
+    inter_sens = (set(t[t["感度分析"]].signature)
+                  & set(v[v.cohort == "Loi RFS"].signature)
+                  & set(v[v.cohort == "NKI RFS"].signature))
+    n_sens_eff = len(inter_sens)
+    out.append(("感度分析 a の実効 n", str(n_sens_eff)))
     out.append(("実効 n（3 コホートすべてで採点可）", str(n_eff)))
-    for n, label in ((n_eff, "実効 n"), (n_sens, "感度分析 n")):
+    for n, label in ((n_eff, "実効 n"), (n_sens_eff, "感度分析 n")):
         for r in (0.30, 0.40, 0.50):
             p = float(norm.cdf(np.arctanh(r) * np.sqrt(n - 3) - norm.ppf(0.975)))
             out.append((f"{label}={n} での検出力 rho={r:.2f}", f"{p:.2f}"))

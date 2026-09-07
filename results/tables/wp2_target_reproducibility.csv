@@ -1,0 +1,6 @@
+﻿quantity,Loi OS vs Loi RFS,n (Loi OS vs Loi RFS),Loi OS vs NKI RFS,n (Loi OS vs NKI RFS),Loi RFS vs NKI RFS,n (Loi RFS vs NKI RFS)
+abs correlation with meta-PCNA (primary target),0.999,44,0.965,43,0.968,43
+"correlation with meta-PCNA, signed",1.0,44,0.95,43,0.95,43
+unadjusted log(HR) (secondary target),0.97,44,0.558,43,0.604,43
+proliferation-adjusted log(HR),0.94,44,0.187,43,0.223,43
+ratio adjusted / unadjusted,0.569,44,0.091,43,0.092,43

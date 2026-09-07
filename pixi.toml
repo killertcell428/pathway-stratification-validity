@@ -62,6 +62,8 @@ wp2-tcga-feasibility = { cmd = "python -m tools.wp2_tcga_feasibility", descripti
 wp2-tcga-outcome = { cmd = "python -m tools.wp2_tcga_outcome", description = "TCGA の生存データで目的変数が作れるかを確認する（#4-#5）" }
 wp2-tcga-grid = { cmd = "python -m tools.wp2_tcga_endpoint_grid", description = "終点 4 種 x コホート 5 種で meta-PCNA の予後関連を全数評価する" }
 wp2-venet-outcome = { cmd = "python -m tools.wp2_venet_outcome", description = "Loi / NKI で Venet の所見を再現し、目的変数の再現性を測る" }
+osf-pack = { cmd = "python -m tools.osf_pack", description = "OSF 事前登録に添付する一式を集め digest 一覧を作る（登録直前に通す）" }
+wp2-target-repro = { cmd = "python -m tools.wp2_target_reproducibility", description = "目的変数の候補ごとのコホート間再現性を出す（事前登録が添付を約束している表）" }
 wp2-audit = { cmd = "python -m tools.audit_wp2_prereg", description = "WP2 事前登録の数値を検査出力の CSV と機械照合する（登録前に必ず通す）" }
 test = "pytest -q tests"
 # --- WP1: RNA-seq 再現（T26_DATASET 名前空間で同じ解析コードを再実行する）---
