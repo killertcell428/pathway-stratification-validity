@@ -40,11 +40,12 @@ preferred-citation:
       affiliation: "Cytra Inc., Tokyo, Japan"
   year: 2026
   month: 9
-  doi: 10.5281/zenodo.22505179
-  url: "https://doi.org/10.5281/zenodo.22505179"
+  doi: 10.5281/zenodo.22914096
+  url: "https://doi.org/10.5281/zenodo.22914096"
   notes: >-
-    Preprint deposited on Zenodo (version DOI). The concept DOI
-    10.5281/zenodo.22505178 always resolves to the latest version.
+    Preprint deposited on Zenodo, version 2 (version DOI). Version 1 is
+    10.5281/zenodo.22505179. The concept DOI 10.5281/zenodo.22505178
+    always resolves to the latest version.
 references:
   # 解析に使った公開コホート。取得元と sha256 は data/checksums/provenance.jsonl にある。
   - type: article

@@ -8,7 +8,7 @@
 
 > **予備知識なしで読める解説**: [`docs/public/04-ここまでの成果_やさしい解説.html`](docs/public/04-ここまでの成果_やさしい解説.html)（高校生物までを前提、用語の対応表つき）
 >
-> 状態: **プレプリント公開済み** — [10.5281/zenodo.22505179](https://doi.org/10.5281/zenodo.22505179)（CC-BY 4.0）。全版を指す concept DOI は [10.5281/zenodo.22505178](https://doi.org/10.5281/zenodo.22505178)。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
+> 状態: **プレプリント公開済み（第 2 版、2026-09-23）** — [10.5281/zenodo.22914096](https://doi.org/10.5281/zenodo.22914096)（CC-BY 4.0。第 1 版は [10.5281/zenodo.22505179](https://doi.org/10.5281/zenodo.22505179)）。全版を指す concept DOI は [10.5281/zenodo.22505178](https://doi.org/10.5281/zenodo.22505178)。全数値は `pixi run audit` で解析出力と機械照合し、表と図の数値は `pixi run qc-tables` で逆向きにも照合している。**使用データは公開アクセッションのみである。**非公開データは一切用いていない。取得元と sha256 は `data/checksums/provenance.jsonl` に記録している。
 
 ## 予備結果（2,195 遺伝子セット × 207 名の検証個人）
 
